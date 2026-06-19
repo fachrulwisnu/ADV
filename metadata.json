@@ -1,0 +1,6 @@
+{
+  "name": "ADV Pro Dashboard",
+  "description": "A fully dynamic project PMO management and SLA tracking dashboard with client-side JSON uploading.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
