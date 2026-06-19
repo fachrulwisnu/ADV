@@ -43,6 +43,7 @@ export function TabCategory({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeModal, setActiveModal] = useState<"classification" | "requested" | "average" | "low_sla" | "leaderboard_division" | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<string | null>(null);
+  const isBpdDivision = activeModal === "leaderboard_division" && selectedDivision === "BUSINESS PROCESS DEVELOPMENT";
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -827,6 +828,25 @@ export function TabCategory({
 
             {/* Modal Table body with strict anti-truncation layouts */}
             <div className="flex-1 overflow-y-auto p-6 max-h-[58vh]">
+              {/* Executive SLA Diagnostics Summary Banner for BUSINESS PROCESS DEVELOPMENT */}
+              {activeModal === "leaderboard_division" && selectedDivision === "BUSINESS PROCESS DEVELOPMENT" && (
+                <div className="mb-5 p-4 rounded-xl border border-red-200 bg-red-50/70 text-red-900 shadow-2xs">
+                  <div className="flex items-start gap-2.5">
+                    <div className="p-1 px-[7px] shrink-0 text-xs font-bold font-mono bg-red-100 text-red-700 rounded-md select-none">
+                      ⚠️ SLA
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-semibold text-red-950 uppercase tracking-wide leading-none mb-1.5 select-none font-display">
+                        Executive SLA Diagnostic Summary
+                      </p>
+                      <p className="text-[11.5px] font-medium leading-relaxed font-sans text-red-900/90 whitespace-normal break-words">
+                        SLA Root-Cause Analysis: Out of 16 evaluated projects, 8 items failed to meet the baseline DEV SLA timeline threshold. Main bottlenecks are driven by extended development turnaround windows (lateDev &gt; 0), repeated requirement modifications during the active build cycle, or lifecycle terminations (Canceled projects).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Classification Top Summary badges */}
               {activeModal === "classification" && groupedClassificationData && (
                 <div className="flex flex-wrap gap-2 mb-5 select-none text-xs">
@@ -869,6 +889,12 @@ export function TabCategory({
                           {activeModal === "average" ? "Evaluated Gate SLAs" : "Owner Div"}
                         </th>
                         <th className="py-3 px-3 w-32 whitespace-normal break-words">Last Status</th>
+                        {isBpdDivision && (
+                          <>
+                            <th className="py-3 px-3 w-32 whitespace-normal break-words font-display font-extrabold text-[#991b1b]">SLA Status</th>
+                            <th className="py-3 px-3 whitespace-normal break-words min-w-[250px] font-display font-extrabold text-[#991b1b]">Delay Log / Bottleneck Reason</th>
+                          </>
+                        )}
                         {activeModal !== "average" && (
                           <th className="py-3 px-3 w-24 text-right whitespace-normal break-words">Priority</th>
                         )}
@@ -885,6 +911,22 @@ export function TabCategory({
                                               sGroup === "Hold" ? "bg-purple-50 text-purple-700 border-purple-100" :
                                               sGroup === "Antrian" ? "bg-amber-50 text-amber-700 border-amber-100" :
                                               "bg-blue-50 text-blue-700 border-blue-100";
+
+                          const lateDev = p._lateDev != null ? p._lateDev : (p.lateDev != null ? p.lateDev : 0);
+                          const lastStatusVal = p["Last Status"] || "";
+                          const statusUpper = lastStatusVal.toUpperCase().trim();
+                          const isCanceled = statusUpper === "CANCELED";
+                          const isSlaFailed = lateDev > 0 || isCanceled;
+
+                          let diagnosticText = "Delivered within standard SLA limits.";
+                          if (lateDev > 0) {
+                            diagnosticText = `Development exceeded target baseline by ${lateDev} days.`;
+                          } else if (statusUpper === "CANCELED") {
+                            diagnosticText = "Project canceled mid-lifecycle; milestone target voided.";
+                          } else if (statusUpper === "CHANGE REQUEST ON PROGRESS") {
+                            diagnosticText = "Scope modification requested during active development phase.";
+                          }
+
                           return (
                             <tr key={`${p["Ticket"] || "pt"}-${runningNo}`} className="hover:bg-gray-50/50 transition-colors text-gray-700">
                               <td className="py-3 px-4 text-center font-mono font-bold text-gray-400 whitespace-normal break-words">
@@ -893,7 +935,7 @@ export function TabCategory({
                               <td className="py-3 px-3 font-mono font-semibold text-gray-500 whitespace-normal break-words">
                                 {p["Ticket"] || "—"}
                               </td>
-                              <td className="py-3 px-3 font-bold text-gray-900 whitespace-normal break-words leading-relaxed">
+                              <td className="py-3 px-3 font-bold text-gray-900 whitespace-normal break-words leading-relaxed select-text">
                                 {p["Project Name"] || "—"}
                               </td>
                               <td className="py-3 px-3 whitespace-normal break-words">
@@ -921,7 +963,7 @@ export function TabCategory({
                                     })}
                                   </div>
                                 ) : (
-                                  <span className="font-semibold text-gray-650">{p["Owner Div"] || "—"}</span>
+                                  <span className="font-semibold text-gray-650 whitespace-normal break-words">{p["Owner Div"] || "—"}</span>
                                 )}
                               </td>
                               <td className="py-3 px-3 whitespace-normal break-words">
@@ -929,6 +971,24 @@ export function TabCategory({
                                   {p["Last Status"] || "—"}
                                 </span>
                               </td>
+                              {isBpdDivision && (
+                                <>
+                                  <td className="py-3 px-3 whitespace-normal break-words">
+                                    {isSlaFailed ? (
+                                      <span className="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md text-red-700 bg-red-50 border border-red-200">
+                                        [SLA FAILED]
+                                      </span>
+                                    ) : (
+                                      <span className="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md text-emerald-700 bg-emerald-50 border border-emerald-200">
+                                        [SLA ACHIEVED]
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-3 whitespace-normal break-words font-medium text-gray-650 leading-relaxed select-text">
+                                    {diagnosticText}
+                                  </td>
+                                </>
+                              )}
                               {activeModal !== "average" && (
                                 <td className="py-3 px-4 text-right font-mono text-[11px] font-extrabold text-gray-550 whitespace-normal break-words">
                                   {p["Prioritas Mgmt"] || "—"}
