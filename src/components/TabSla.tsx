@@ -3,6 +3,8 @@ import { DashboardDataset } from "../types";
 import { Card, Icon, Pill } from "./UI";
 import { PieChart, GroupedBarChart } from "./Charts";
 import { statusKindOfStatus } from "../parser";
+import { getActiveSlaPool } from "../utils";
+
 
 interface TabSlaProps {
   dataset: DashboardDataset;
@@ -53,14 +55,18 @@ function isMonthInRange(mIdx: number, startIdx: number, endIdx: number): boolean
 export function TabSla({
   dataset,
   rawProjects,
-  filteredProjects = [],
-  allProjects = [],
+  filteredProjects: rawFilteredProjects = [],
+  allProjects: rawAllProjects = [],
   startMonth = "Jan",
   endMonth = "Dec",
   startYear = 2026,
   endYear = 2026,
   onUploadFile
 }: TabSlaProps) {
+  // Exclude Canceled projects from SLA Review Views
+  const filteredProjects = useMemo(() => getActiveSlaPool(rawFilteredProjects), [rawFilteredProjects]);
+  const allProjects = useMemo(() => getActiveSlaPool(rawAllProjects), [rawAllProjects]);
+
   // Search filter query
   const [searchQuery, setSearchQuery] = useState("");
   const [delayPage, setDelayPage] = useState(1);

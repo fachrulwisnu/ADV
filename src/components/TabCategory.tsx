@@ -2,6 +2,8 @@ import React, { useState, useMemo, useRef } from "react";
 import { DashboardDataset } from "../types";
 import { Card, Icon } from "./UI";
 import { PieChart } from "./Charts";
+import { getActiveSlaPool } from "../utils";
+
 
 interface TabCategoryProps {
   dataset: DashboardDataset;
@@ -166,7 +168,8 @@ export function TabCategory({
   // Exclude exactly "INFORMATION TECHNOLOGY" or "Wisesa"
   const computedLeaderboard = useMemo(() => {
     const divisionsMap: Record<string, { total: number; achieved: number; not: number }> = {};
-    tabProjects.forEach((p) => {
+    const activePool = getActiveSlaPool(tabProjects);
+    activePool.forEach((p) => {
       const div = p["Owner Div"] || "Unassigned";
       const checkDivUpper = div.toUpperCase();
       if (checkDivUpper === "INFORMATION TECHNOLOGY" || checkDivUpper === "WISESA") {
@@ -225,7 +228,8 @@ export function TabCategory({
       "UAT SLA",
       "Live SLA",
     ];
-    tabProjects.forEach((p) => {
+    const activePool = getActiveSlaPool(tabProjects);
+    activePool.forEach((p) => {
       slaFields.forEach((f) => {
         if (p[f] === "Achieved" || p[f] === "Not Achieved") {
           totalEvaluations++;
@@ -292,15 +296,15 @@ export function TabCategory({
       case "requested":
         return tabProjects.filter((p) => (p["Owner Div"] || "").toUpperCase() !== "INFORMATION TECHNOLOGY");
       case "average":
-        return tabProjects.filter((p) =>
+        return getActiveSlaPool(tabProjects).filter((p) =>
           ["FSD SLA", "DEV SLA", "SIT SLA", "UAT SLA", "Live SLA"].some(
             (field) => p[field] === "Achieved" || p[field] === "Not Achieved"
           )
         );
       case "low_sla":
-        return tabProjects.filter((p) => p["Owner Div"] === lowestSlaDiv.division);
+        return getActiveSlaPool(tabProjects).filter((p) => p["Owner Div"] === lowestSlaDiv.division);
       case "leaderboard_division":
-        return tabProjects.filter((p) => p["Owner Div"] === selectedDivision);
+        return getActiveSlaPool(tabProjects).filter((p) => p["Owner Div"] === selectedDivision);
       default:
         return [];
     }
@@ -829,23 +833,29 @@ export function TabCategory({
             {/* Modal Table body with strict anti-truncation layouts */}
             <div className="flex-1 overflow-y-auto p-6 max-h-[58vh]">
               {/* Executive SLA Diagnostics Summary Banner for BUSINESS PROCESS DEVELOPMENT */}
-              {activeModal === "leaderboard_division" && selectedDivision === "BUSINESS PROCESS DEVELOPMENT" && (
-                <div className="mb-5 p-4 rounded-xl border border-red-200 bg-red-50/70 text-red-900 shadow-2xs">
-                  <div className="flex items-start gap-2.5">
-                    <div className="p-1 px-[7px] shrink-0 text-xs font-bold font-mono bg-red-100 text-red-700 rounded-md select-none">
-                      ⚠️ SLA
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-semibold text-red-950 uppercase tracking-wide leading-none mb-1.5 select-none font-display">
-                        Executive SLA Diagnostic Summary
-                      </p>
-                      <p className="text-[11.5px] font-medium leading-relaxed font-sans text-red-900/90 whitespace-normal break-words">
-                        SLA Root-Cause Analysis: Out of 16 evaluated projects, 8 items failed to meet the baseline DEV SLA timeline threshold. Main bottlenecks are driven by extended development turnaround windows (lateDev &gt; 0), repeated requirement modifications during the active build cycle, or lifecycle terminations (Canceled projects).
-                      </p>
+              {activeModal === "leaderboard_division" && selectedDivision === "BUSINESS PROCESS DEVELOPMENT" && (() => {
+                const bpdProjects = tabProjects.filter(p => (p["Owner Div"] || "").toUpperCase() === "BUSINESS PROCESS DEVELOPMENT");
+                const bpdActiveSlaPool = getActiveSlaPool(bpdProjects);
+                const bpdEvaluatedDevSla = bpdActiveSlaPool.filter(p => p["DEV SLA"] === "Achieved" || p["DEV SLA"] === "Not Achieved");
+                const bpdFailedDevSlaCount = bpdEvaluatedDevSla.filter(p => p["DEV SLA"] === "Not Achieved").length;
+                return (
+                  <div className="mb-5 p-4 rounded-xl border border-red-200 bg-red-50/70 text-red-900 shadow-2xs">
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-1 px-[7px] shrink-0 text-xs font-bold font-mono bg-red-100 text-red-700 rounded-md select-none">
+                        ⚠️ SLA
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-semibold text-red-950 uppercase tracking-wide leading-none mb-1.5 select-none font-display">
+                          Executive SLA Diagnostic Summary
+                        </p>
+                        <p className="text-[11.5px] font-medium leading-relaxed font-sans text-red-900/90 whitespace-normal break-words">
+                          SLA Root-Cause Analysis: Out of {bpdEvaluatedDevSla.length} evaluated projects, {bpdFailedDevSlaCount} items failed to meet the baseline DEV SLA timeline threshold. Main bottlenecks are driven by extended development turnaround windows (lateDev &gt; 0), repeated requirement modifications during the active build cycle, or lifecycle terminations (Canceled projects).
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Classification Top Summary badges */}
               {activeModal === "classification" && groupedClassificationData && (

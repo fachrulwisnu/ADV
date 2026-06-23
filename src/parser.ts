@@ -1,4 +1,5 @@
 import { RawProject, SanitizedProject, DashboardDataset, KpiItem, MilestoneItem } from "./types";
+import { getProjectIntakeYear } from "./utils";
 
 export function statusGroupOf(status: string | null): string {
   const s = (status || '').trim();
@@ -40,7 +41,7 @@ function parsePercent(val: any): number | null {
 export function sanitizeProjects(data: RawProject[]): SanitizedProject[] {
   return data.map(d => ({
     ...d,
-    _year:       d["Year"]   != null ? String(d["Year"]).replace(".0","") : "Unscheduled",
+    _year:       getProjectIntakeYear(d),
     _period:     d["Period"] != null ? d["Period"] : "Unscheduled",
     _typeGroup: (function(t) {
       if (!t) return "Other";
@@ -548,7 +549,7 @@ export function computeDashboardMetrics(data: SanitizedProject[], rawData?: RawP
       }
 
       const period = p["Period"] || p["_period"];
-      const yearVal = p["Year"] || p["_year"];
+      const yearVal = getProjectIntakeYear(p);
       if (period && yearVal) {
         const parts = String(period).trim().split("-");
         if (parts.length > 0) {
@@ -617,7 +618,7 @@ export function computeDashboardMetrics(data: SanitizedProject[], rawData?: RawP
       { key: 'monitoring', label: 'Monitoring', value: monitoringCount, sub: 'Post go-live', color: '#0891B2', icon: 'Activity', filter: 'Monitoring' },
       { key: 'hold', label: 'Hold', value: holdCount, sub: 'Paused pipelines', color: '#A855F7', icon: 'Pause', filter: 'Hold', split: [
         { label: 'Hold by Owner', value: holdByOwner },
-        { label: 'Hold by Client/IT', value: holdByVendor }
+        { label: 'Hold by Client/VENDOR', value: holdByVendor }
       ]}
     ],
     statusCounts: [

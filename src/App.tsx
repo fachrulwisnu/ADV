@@ -8,21 +8,60 @@ import { TabSla } from "./components/TabSla";
 import { TabCategory } from "./components/TabCategory";
 import { TabProjects } from "./components/TabProjects";
 
-const globallyFilterData = (data: any[]): any[] => {
-  return data.filter(d => {
-    const typeProj = d["Type Project"] ? String(d["Type Project"]).trim().toLowerCase() : "";
-    if (typeProj === "internal it" || typeProj === "approval digital") return false;
+function sanitizeAndLoadMasterJSON(rawJSONData: any[]): any[] {
+  if (!rawJSONData || !Array.isArray(rawJSONData)) return [];
 
-    const ownerDiv = d["Owner Div"] ? String(d["Owner Div"]).trim().toLowerCase() : "";
-    if (ownerDiv === "wisesa" || ownerDiv === "it") return false;
+  return rawJSONData.map((row) => {
+    // Standardize division mapping directly from the active JSON structural property keys
+    const rawDiv = row["Owner Div"] || row["Owner Division"] || row["Divisi"] || "";
+    const rawProjectName = row["Project Name"] || row["Nama Project"] || "";
 
-    return true;
+    return {
+      ...row,
+      "Project Name": rawProjectName.toString().trim(),
+      "Owner Div": rawDiv.toString().trim(),
+      "Owner Name": row["Owner Name"] ? String(row["Owner Name"]).trim() : "Unknown Owner",
+      "PIC Name": row["PIC Name"] ? String(row["PIC Name"]).trim() : "Unknown PIC",
+      "Last Status": row["Last Status"] ? String(row["Last Status"]).trim() : "Unknown Status",
+      "Type Project": row["Type Project"] ? String(row["Type Project"]).trim() : "Project Utama",
+      "(FSD) Status": row["(FSD) Status"] ? String(row["(FSD) Status"]).trim() : "",
+      "(Dev) Status": row["(Dev) Status"] ? String(row["(Dev) Status"]).trim() : "",
+      "(SIT) Status": row["(SIT) Status"] ? String(row["(SIT) Status"]).trim() : ""
+    };
   });
-};
+}
+
+declare global {
+  interface Window {
+    rawMasterDataset?: any[];
+  }
+}
+
+function getBusinessOperationalData(dataset: any[]): any[] {
+  if (!dataset || !Array.isArray(dataset)) return [];
+  
+  return dataset.filter(item => {
+    const division = item["Owner Div"] ? String(item["Owner Div"]).trim().toUpperCase() : "";
+    const type = item["Type Project"] ? String(item["Type Project"]).trim().toUpperCase() : "";
+    const name = item["Project Name"] ? String(item["Project Name"]).trim().toUpperCase() : "";
+    
+    // Explicitly exclude internal IT and Wisesa core infra entries
+    const isExcludedIT = division === "IT" || division === "INFORMATION TECHNOLOGY" || division === "WISESA";
+    const isApprovalDigital = type === "APPROVAL DIGITAL" || name.startsWith("APPROVAL DIGITAL");
+    
+    return !isExcludedIT && !isApprovalDigital;
+  });
+}
 
 export default function App() {
   // ---- Internal Core States ----
-  const [rawProjects, setRawProjects] = useState(() => globallyFilterData(DEFAULT_RAW_PROJECTS));
+  const [rawProjects, setRawProjects] = useState<any[]>(() => {
+    const sanitized = sanitizeAndLoadMasterJSON(DEFAULT_RAW_PROJECTS);
+    if (typeof window !== "undefined") {
+      window.rawMasterDataset = sanitized;
+    }
+    return sanitized;
+  });
   const [isCustomLoaded, setIsCustomLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // 0: Overview, 1: Pipeline, 2: SLA, 3: Category, 4: Projects
   const [isDragging, setIsDragging] = useState(false);
@@ -120,21 +159,21 @@ export default function App() {
     return sanitizeProjects(rawProjects);
   }, [rawProjects]);
 
+  const businessRawProjects = useMemo(() => {
+    const rawList = window.rawMasterDataset || rawProjects || [];
+    return getBusinessOperationalData(rawList);
+  }, [rawProjects]);
+
+  const businessSanitizedProjects = useMemo(() => {
+    return sanitizeProjects(businessRawProjects);
+  }, [businessRawProjects]);
+
   const availableYears = useMemo(() => {
     const yearsSet = new Set<number>();
     sanitizedProjects.forEach((p) => {
-      const period = p["Period"];
-      if (period) {
-        const parts = period.trim().split("-");
-        if (parts.length >= 2) {
-          let yr = parseInt(parts[1], 10);
-          if (!isNaN(yr)) {
-            if (parts[1].length === 2) {
-              yr = 2000 + yr;
-            }
-            yearsSet.add(yr);
-          }
-        }
+      const yr = parseInt(p._year, 10);
+      if (!isNaN(yr)) {
+        yearsSet.add(yr);
       }
     });
     const list = Array.from(yearsSet).sort((a, b) => a - b);
@@ -166,7 +205,7 @@ export default function App() {
     }
   }, [availableYears, MONTH_NAMES]);
 
-  const filteredProjects = useMemo(() => {
+  const businessFilteredProjects = useMemo(() => {
     const MONTH_MAP: Record<string, number> = {
       jan: 0,
       feb: 1,
@@ -213,7 +252,7 @@ export default function App() {
     const scoreStart = getComboScore(startMonth, startYear);
     const scoreEnd = getComboScore(endMonth, endYear);
 
-    return sanitizedProjects.filter((p) => {
+    return businessSanitizedProjects.filter((p) => {
       const periodStr = p["Period"];
       if (!periodStr) return false;
 
@@ -222,11 +261,11 @@ export default function App() {
 
       return scoreProject >= scoreStart && scoreProject <= scoreEnd;
     });
-  }, [sanitizedProjects, startMonth, startYear, endMonth, endYear]);
+  }, [businessSanitizedProjects, startMonth, startYear, endMonth, endYear]);
 
-  const dataset = useMemo(() => {
-    return computeDashboardMetrics(filteredProjects, sanitizedProjects, startMonth, endMonth);
-  }, [filteredProjects, sanitizedProjects, startMonth, endMonth]);
+  const businessDataset = useMemo(() => {
+    return computeDashboardMetrics(businessFilteredProjects, businessSanitizedProjects, startMonth, endMonth);
+  }, [businessFilteredProjects, businessSanitizedProjects, startMonth, endMonth]);
 
   // ---- File Upload Handlers (FileReader HTML5 API) ----
   const processUploadedFile = (file: File) => {
@@ -255,11 +294,14 @@ export default function App() {
           throw new Error("Elemen di dalam array bukan merupakan objek.");
         }
 
-        const globallyFilteredData = globallyFilterData(parsed);
-        setRawProjects(globallyFilteredData);
+        const sanitizedFullData = sanitizeAndLoadMasterJSON(parsed);
+        window.rawMasterDataset = sanitizedFullData;
+        console.log("Global State Ingested:", window.rawMasterDataset.length); // Must equal 530
+
+        setRawProjects(sanitizedFullData);
         setIsCustomLoaded(true);
         setActiveTab(0); // bounce user back to first view to immediately notice visual changes!
-        triggerAlert("Berhasil memproses & menyelaraskan database dashboard dengan data kustom Anda!");
+        triggerAlert(`${sanitizedFullData.length} Records Loaded Successfully! Berhasil memproses & menyelaraskan database kustom Anda!`);
       } catch (err: any) {
         triggerAlert(`Gagal mengurai JSON: ${err.message}`);
       }
@@ -293,7 +335,9 @@ export default function App() {
 
   const handleResetToDefault = () => {
     if (confirm("Apakah Anda yakin ingin mematikan data kustom dan kembali ke database default?")) {
-      setRawProjects(globallyFilterData(DEFAULT_RAW_PROJECTS));
+      const sanitizedDefault = sanitizeAndLoadMasterJSON(DEFAULT_RAW_PROJECTS);
+      window.rawMasterDataset = sanitizedDefault;
+      setRawProjects(sanitizedDefault);
       setIsCustomLoaded(false);
       setActiveTab(0);
       triggerAlert("Database dashboard berhasil dipulihkan ke default!");
@@ -302,11 +346,11 @@ export default function App() {
 
   // ---- Navigation Definition ----
   const tabs = [
-    { label: "Overview", icon: "grid", description: "Ringkasan Eksekutif" },
-    { label: "Pipelines", icon: "layers", description: "Laju Aliran Project" },
-    { label: "Milestone & SLA", icon: "gauge", description: "Performa & Deviasi SLA" },
-    { label: "Kategori & Divisi", icon: "pie", description: "Taksonomi & Liga Kualitas" },
-    { label: "Project List", icon: "folder", description: "Database & Audit Detail" }
+    { label: "Overview", icon: "grid", description: "" },
+    { label: "Pipelines", icon: "layers", description: "" },
+    { label: "Milestone & SLA", icon: "gauge", description: "" },
+    { label: "Kategori & Divisi", icon: "pie", description: "" },
+    { label: "Project List", icon: "folder", description: "" }
   ];
 
   return (
@@ -397,9 +441,11 @@ export default function App() {
                   <span className="text-[12.5px] font-bold block leading-none font-display">
                     {t.label}
                   </span>
-                  <span className={`text-[10px] block mt-0.5 font-medium ${isActive ? "text-white/70" : "text-gray-400"}`}>
-                    {t.description}
-                  </span>
+                  {t.description && (
+                    <span className={`text-[10px] block mt-0.5 font-medium ${isActive ? "text-white/70" : "text-gray-400"}`}>
+                      {t.description}
+                    </span>
+                  )}
                 </div>
               </button>
             );
@@ -446,7 +492,7 @@ export default function App() {
           {/* Clean Top controls containing interactive file inputs */}
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-xs text-gray-400 font-medium font-sans hidden lg:inline mr-2">
-              Publication Date: <strong className="text-gray-700">{dataset.report.date}</strong>
+              Publication Date: <strong className="text-gray-700">{businessDataset.report.date}</strong>
             </span>
 
             {/* Dropdown Filter Date Range (Start Date & End Date) */}
@@ -547,7 +593,7 @@ export default function App() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-bold text-gray-800 font-sans">
-                  Mode Kustom Aktif
+                  {rawProjects.length} Records Loaded Successfully!
                 </p>
                 <p className="text-[11px] text-gray-500 font-medium leading-relaxed mt-0.5 truncate max-w-[280px] sm:max-w-md lg:max-w-2xl">
                   Dashboard saat ini menampilkan total <strong className="text-emerald-700">{rawProjects.length} catatan</strong> kustom yang dibaca asinkron langsung di browser Anda.
@@ -565,34 +611,62 @@ export default function App() {
 
         {/* Content Screens Container Port */}
         <div className="flex-1 p-6">
-          {activeTab === 0 && <TabOverview dataset={dataset} filteredProjects={filteredProjects} allProjects={sanitizedProjects} startMonth={startMonth} endMonth={endMonth} onNavigateToTab={(idx) => setActiveTab(idx)} />}
-          {activeTab === 1 && <TabPipeline dataset={dataset} filteredProjects={filteredProjects} />}
+          {activeTab === 0 && (
+            <React.Fragment key={`tab-0-${rawProjects.length}`}>
+              <TabOverview
+                dataset={businessDataset}
+                filteredProjects={businessFilteredProjects}
+                allProjects={businessSanitizedProjects}
+                startMonth={startMonth}
+                endMonth={endMonth}
+                onNavigateToTab={(idx) => setActiveTab(idx)}
+              />
+            </React.Fragment>
+          )}
+          {activeTab === 1 && (
+            <React.Fragment key={`tab-1-${rawProjects.length}`}>
+              <TabPipeline
+                dataset={businessDataset}
+                filteredProjects={businessFilteredProjects}
+              />
+            </React.Fragment>
+          )}
           {activeTab === 2 && (
-            <TabSla
-              dataset={dataset}
-              rawProjects={rawProjects}
-              filteredProjects={filteredProjects}
-              allProjects={sanitizedProjects}
-              startMonth={startMonth}
-              endMonth={endMonth}
-              startYear={startYear}
-              endYear={endYear}
-              onUploadFile={processUploadedFile}
-            />
+            <React.Fragment key={`tab-2-${rawProjects.length}`}>
+              <TabSla
+                dataset={businessDataset}
+                rawProjects={businessRawProjects}
+                filteredProjects={businessFilteredProjects}
+                allProjects={businessSanitizedProjects}
+                startMonth={startMonth}
+                endMonth={endMonth}
+                startYear={startYear}
+                endYear={endYear}
+                onUploadFile={processUploadedFile}
+              />
+            </React.Fragment>
           )}
           {activeTab === 3 && (
-            <TabCategory
-              dataset={dataset}
-              rawProjects={rawProjects}
-              filteredProjects={filteredProjects}
-              startMonth={startMonth}
-              endMonth={endMonth}
-              startYear={startYear}
-              endYear={endYear}
-              onUploadFile={processUploadedFile}
-            />
+            <React.Fragment key={`tab-3-${rawProjects.length}`}>
+              <TabCategory
+                dataset={businessDataset}
+                rawProjects={businessRawProjects}
+                filteredProjects={businessFilteredProjects}
+                startMonth={startMonth}
+                endMonth={endMonth}
+                startYear={startYear}
+                endYear={endYear}
+                onUploadFile={processUploadedFile}
+              />
+            </React.Fragment>
           )}
-          {activeTab === 4 && <TabProjects projects={filteredProjects} />}
+          {activeTab === 4 && (
+            <React.Fragment key={`tab-4-${rawProjects.length}`}>
+              <TabProjects
+                projects={sanitizeProjects(window.rawMasterDataset || rawProjects || [])}
+              />
+            </React.Fragment>
+          )}
         </div>
       </main>
     </div>

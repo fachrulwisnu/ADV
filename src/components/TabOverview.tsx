@@ -2,6 +2,64 @@ import React, { useState, useMemo } from "react";
 import { DashboardDataset } from "../types";
 import { Card, Icon } from "./UI";
 import { statusGroupOf } from "../parser";
+import { getGlobalProjectDate, getGlobalProgressUpdate, formatLogWithNewLines, getProjectIntakeYear, formatUATBatchText, calculateProjectAverageScore, getActiveSlaPool } from "../utils";
+
+const INCOMING_PROJECTS_DATA = {
+  "Maret": [
+    { "ticket": "26030035", "name": "Project Pembuatan menu Penawaran Harga Emas Antam Indonesia", "pic": "MUHAMMAD EUROSKI YUDISETYO", "owner": "ERMAN RATIUS", "div": "GUARDING MANAGEMENT", "type": "Project Utama" },
+    { "ticket": "260312015", "name": "PERUBAHAN TAMPILAN PADA DCT BONYS", "pic": "NANDANA BHAKTI KHAER", "owner": "RIA YULITA", "div": "FINANCE & ACCOUNTING", "type": "Approval Digital" },
+    { "ticket": "26030028", "name": "Enhancement Flow Process Planner CIT", "pic": "ILHAM NUR HIDAYAT", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Project Utama" },
+    { "ticket": "26030618", "name": "Permintaan Type MOA Selisih Escrow Bank Mega", "pic": "BIMO ADI NURZAMAN", "owner": "YUNI SUDIRMAN", "div": "FINANCE & ACCOUNTING", "type": "Approval Digital" },
+    { "ticket": "26030043", "name": "CPM 2 Prepare Delivery and Release Version", "pic": "ALDI DWI KURNIAWAN", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Project Utama" },
+    { "ticket": "26030025", "name": "Digitalisasi system Preventive Maintenance dan Quality Control", "pic": "BIZDEV", "owner": "JIMMY DARSONO", "div": "WISESA", "type": "Internal IT" },
+    { "ticket": "26030042", "name": "CPM 2 Valas Version", "pic": "YUDHA DIRGANTARA", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Project Utama" }
+  ],
+  "April": [
+    { "ticket": "26040045", "name": "Enhance Laporan Pinalty CIT Khusus BNI Medan", "pic": "ALLBY VALDIAN FURIAWAN", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Antrian Enhance Kecil" },
+    { "ticket": "26040050", "name": "Enhancement Cargo - Chage Request", "pic": "NANDANA BHAKTI KHAER", "owner": "YUNI SUDIRMAN", "div": "FINANCE & ACCOUNTING", "type": "Enhance Kecil" },
+    { "ticket": "260428046", "name": "Penambahan validasi pada saat generate di DCT dan validasi invoice di insyst", "pic": "NANDANA BHAKTI KHAER", "owner": "YUNI SUDIRMAN", "div": "FINANCE & ACCOUNTING", "type": "Approval Digital" },
+    { "ticket": "260429021", "name": "Hide Menu Assignment Security DCT SSS", "pic": "ALLBY VALDIAN FURIAWAN", "owner": "OKA AULIA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Approval Digital" },
+    { "ticket": "260415026", "name": "Enhancement transaksi cargo pada aplikasi insyst", "pic": "NANDANA BHAKTI KHAER", "owner": "YUNI SUDIRMAN", "div": "FINANCE & ACCOUNTING", "type": "Approval Digital" },
+    { "ticket": "260429032", "name": "Perubahan Validasi Login DCT Visitor", "pic": "DIVA ADELIA PUTRA", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Approval Digital" },
+    { "ticket": "26040049", "name": "Request Order Planning By Mail", "pic": "WAHIDATUZZAHRO FEBRIA FITHRU...", "owner": "JIMMY DARSONO", "div": "WISESA", "type": "Internal IT" },
+    { "ticket": "260424007", "name": "Berita Acara Penambahan Rumus Aktivasi Pada Master Entity History", "pic": "NANDANA BHAKTI KHAER", "owner": "DJOKO BUDIANTO", "div": "MARKETING", "type": "Approval Digital" },
+    { "ticket": "260430059", "name": "Penambahan tombol duplicate pada menu Lampiran Invoice - Custom Report Setup (CIT) di aplikasi insyst", "pic": "NANDANA BHAKTI KHAER", "owner": "YUNI SUDIRMAN", "div": "FINANCE & ACCOUNTING", "type": "Approval Digital" },
+    { "ticket": "26040051", "name": "Enhancement Monitoring Dashboard Problem", "pic": "WAHIDATUZZAHRO FEBRIA FITHRU...", "owner": "HANGGA DAVID ...", "div": "CENTRALIZED OPERATION SUPPORT", "type": "Internal IT" },
+    { "ticket": "26040056", "name": "Otomasi Bill Counter dengan OC", "pic": "ZULFIKAR BAYU BUDIMAN", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Project Utama" },
+    { "ticket": "260415024", "name": "Enahancement pada menu penerimaan uang di aplikasi insyst", "pic": "NANDANA BHAKTI KHAER", "owner": "YUNI SUDIRMAN", "div": "FINANCE & ACCOUNTING", "type": "Approval Digital" },
+    { "ticket": "260423038", "name": "Penyesuaian Web Karir V2", "pic": "ADITYA PUTRA AJI NUR ALAMSYAH", "owner": "ADI WIBOWO", "div": "HUMAN RESOURCES", "type": "Approval Digital" },
+    { "ticket": "260427018", "name": "Penambahan Report Physical Cash Data pada Menu Stock Opname", "pic": "MUFID NUR TAMAM", "owner": "NIKEN YULASTRI", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Approval Digital" },
+    { "ticket": "260420065", "name": "PENYESUAIAN PADA FIXAM IT", "pic": "MUFID NUR TAMAM", "owner": "JIMMY DARSONO", "div": "WISESA", "type": "Internal IT" },
+    { "ticket": "260420060", "name": "Penambahan Fitur Search Menu Runsheet by Sektor", "pic": "DIVA ADELIA PUTRA", "owner": "OKA AULIA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Approval Digital" },
+    { "ticket": "260415021", "name": "Enahancement pada accounting system", "pic": "NANDANA BHAKTI KHAER", "owner": "YUNI SUDIRMAN", "div": "FINANCE & ACCOUNTING", "type": "Approval Digital" },
+    { "ticket": "260420061", "name": "Pengajuan Setting Report Custom BA CRM Bank OCBC ALL Cabang", "pic": "NANDANA BHAKTI KHAER", "owner": "CICIH RUNIANTI", "div": "CENTRALIZED OPERATION SUPPORT", "type": "Approval Digital" },
+    { "ticket": "26040052", "name": "Peningkatan dan Perbaikan Sistem Centran", "pic": "RONA REALITA NAJMA", "owner": "HANGGA DAVID ...", "div": "CENTRALIZED OPERATION SUPPORT", "type": "Internal IT" },
+    { "ticket": "260416033", "name": "Penambahan Kolom Status Approval di Report Detail FPTK", "pic": "ADITYA PUTRA AJI NUR ALAMSYAH", "owner": "ADI WIBOWO", "div": "HUMAN RESOURCES", "type": "Approval Digital" },
+    { "ticket": "260408018", "name": "Penambahan Kolom Tgl.Maks Kontrak pada Email Reminder Berakhir Masa Kontrak Karyawan", "pic": "ADITYA PUTRA AJI NUR ALAMSYAH", "owner": "ADI WIBOWO", "div": "HUMAN RESOURCES", "type": "Approval Digital" },
+    { "ticket": "260408017", "name": "Penambahan Field SIM Terupload di menu FPTK", "pic": "ADITYA PUTRA AJI NUR ALAMSYAH", "owner": "ADI WIBOWO", "div": "HUMAN RESOURCES", "type": "Approval Digital" },
+    { "ticket": "26040044", "name": "Enhancement Import Saldo Bank Jateng", "pic": "HASAN KHOIRUL ARI SETIYAWAN", "owner": "NINDYA TRIANA ...", "div": "CENTRALIZED OPERATION SUPPORT", "type": "Enhance Kecil" },
+    { "ticket": "260409006", "name": "Enhancement kepada fitur retur untuk invoice COD", "pic": "MUHAMMAD EUROSKI YUDISETYO", "owner": "ERMAN RATIUS", "div": "GUARDING MANAGEMENT", "type": "Approval Digital" }
+  ],
+  "Mei": [
+    { "ticket": "260520014", "name": "PENYESUAIAN H2H TAF UNTUK ADAPTASI PERUBAHAN API SNAP DI SISI TAF DAN DANAMON", "pic": "BIMO ADI NURZAMAN", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Approval Digital" },
+    { "ticket": "260528066", "name": "Upgrade Protokol Keamanan Menjadi TLS 1.3 Pada Semua H2H Danamon", "pic": "BIMO ADI NURZAMAN", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Approval Digital" },
+    { "ticket": "26050062", "name": "Redesign UI inputer Om Dedy", "pic": "ALDI DWI KURNIAWAN", "owner": "JIMMY DARSONO", "div": "WISESA", "type": "Internal IT" },
+    { "ticket": "26050058", "name": "Enhance Otomatisasi Perhitungan EJ", "pic": "BIMO ADI NURZAMAN", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Enhance Kecil" },
+    { "ticket": "260506021", "name": "Pengajuan Setting Report Custom BA ATM dan CRM Bank Maybank ALL Cabang", "pic": "NANDANA BHAKTI KHAER", "owner": "CICIH RUNIANTI", "div": "CENTRALIZED OPERATION SUPPORT", "type": "Approval Digital" },
+    { "ticket": "260506024", "name": "Permohonan Penyesuaian Informasi User Dan Time Edit Pada History Edit Pricing", "pic": "NANDANA BHAKTI KHAER", "owner": "DJOKO BUDIANTO", "div": "MARKETING", "type": "Approval Digital" },
+    { "ticket": "26050057", "name": "INTEGRASI DEKLARASI MOA", "pic": "BIMO ADI NURZAMAN", "owner": "RIA YULITA", "div": "FINANCE & ACCOUNTING", "type": "Enhance Kecil" },
+    { "ticket": "26050059", "name": "Route Plan AI", "pic": "RONA REALITA NAJMA", "owner": "JIMMY DARSONO", "div": "WISESA", "type": "Internal IT" },
+    { "ticket": "260511005", "name": "Penambahan Label Total Per Denom pada Detail Physical Cash Data", "pic": "MUFID NUR TAMAM", "owner": "NIKEN YULASTRI", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Approval Digital" }
+  ],
+  "Juni": [
+    { "ticket": "260617024", "name": "Penambahan Cabang Serang Rawamangun dan Karawang API Webportal Bank MAS", "pic": "ILHAM NUR HIDAYAT", "owner": "NIKEN YULASTRI", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Approval Digital" },
+    { "ticket": "260604058", "name": "Perubahan Lookup Data Input roster Risk Management", "pic": "DIVA ADELIA PUTRA", "owner": "ADI WIBOWO", "div": "HUMAN RESOURCES", "type": "Approval Digital" },
+    { "ticket": "260612007", "name": "Penambahan Kolom Instruksi dan Keterangan Tugas pada Report DCT On Site Surveillance", "pic": "ADITYA PUTRA AJI NUR ALAMSYAH", "owner": "ISHAK", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Approval Digital" },
+    { "ticket": "26060073", "name": "Penambahan Category FIT ATM", "pic": "MUHAMMAD EUROSKI YUDISETYO", "owner": "NIKEN YULASTRI", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Project Utama" },
+    { "ticket": "260611044", "name": "Permintaan Perubahan Parameter Dormant Layanan Nasabah Prodia Menjadi 180 Hari", "pic": "NANDANA BHAKTI KHAER", "owner": "AMANDHA MARI...", "div": "MARKETING", "type": "Approval Digital" },
+    { "ticket": "26060069", "name": "Host to Host Setoran Mesin CDM GLORY DE-70 (PT. Gemma) sampai terkredit ke Maybank", "pic": "ALDI DWI KURNIAWAN", "owner": "JUNITA", "div": "BUSINESS PROCESS DEVELOPMENT", "type": "Enhance Kecil" }
+  ]
+};
 
 const HISTORICAL_QUEUE_SNAPSHOT = [
   {
@@ -469,13 +527,13 @@ interface TabOverviewProps {
   endMonth?: string;
 }
 
-function ProgressCircle({ pct, color, size = 88, strokeWidth = 8 }: { pct: number; color: string; size?: number; strokeWidth?: number }) {
+function ProgressCircle({ pct, color, size = 128, strokeWidth = 12 }: { pct: number; color: string; size?: number; strokeWidth?: number }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (pct / 100) * circumference;
 
   return (
-    <div className="relative flex items-center justify-center select-none" style={{ width: size, height: size }}>
+    <div className="relative flex items-center justify-center select-none bg-white rounded-full z-10 shadow-3xs" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="transform -rotate-90">
         {/* Underlay base circle */}
         <circle
@@ -484,7 +542,7 @@ function ProgressCircle({ pct, color, size = 88, strokeWidth = 8 }: { pct: numbe
           r={radius}
           className="stroke-gray-100"
           strokeWidth={strokeWidth}
-          fill="transparent"
+          fill="white"
         />
         {/* Colorful dynamic progress ring arc */}
         <circle
@@ -500,7 +558,7 @@ function ProgressCircle({ pct, color, size = 88, strokeWidth = 8 }: { pct: numbe
           className="transition-all duration-700 ease-out"
         />
       </svg>
-      <span className="absolute text-sm font-extrabold font-mono text-gray-800">{pct}%</span>
+      <span className="absolute text-2xl font-extrabold text-slate-800 font-sans">{pct}%</span>
     </div>
   );
 }
@@ -526,6 +584,22 @@ const getFeedbackComments = (p: any): string[] => {
   });
   return comments;
 };
+
+function getBusinessOperationalData(dataset: any[]): any[] {
+  if (!dataset || !Array.isArray(dataset)) return [];
+  
+  return dataset.filter(item => {
+    const division = item["Owner Div"] ? String(item["Owner Div"]).trim().toUpperCase() : "";
+    const type = item["Type Project"] ? String(item["Type Project"]).trim().toUpperCase() : "";
+    const name = item["Project Name"] ? String(item["Project Name"]).trim().toUpperCase() : "";
+    
+    // Explicitly exclude internal IT and Wisesa core infra entries
+    const isExcludedIT = division === "IT" || division === "INFORMATION TECHNOLOGY" || division === "WISESA";
+    const isApprovalDigital = type === "APPROVAL DIGITAL" || name.startsWith("APPROVAL DIGITAL");
+    
+    return !isExcludedIT && !isApprovalDigital;
+  });
+}
 
 export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allProjects, startMonth, endMonth }: TabOverviewProps) {
   const { report, kpis, devSla2026, yoySla, feedback, uatRescheduled, goLive } = dataset;
@@ -559,6 +633,8 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
   } | null>(null);
 
   const [selectedHistTab, setSelectedHistTab] = useState<'W5 Mar 26' | 'W1 Apr 26' | 'W2 Apr 26' | 'W3 Apr 26'>('W3 Apr 26');
+  const [modalActiveView, setModalActiveView] = useState<'backlog' | 'incoming'>('backlog');
+  const [selectedIncomingMonth, setSelectedIncomingMonth] = useState<'Maret' | 'April' | 'Mei' | 'Juni'>('Maret');
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   // Render gold rating stars accurately
@@ -581,23 +657,46 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
 
   // Safe query to obtain "Queue" specifically (which strictly matches "On Queue") - COMPLETELY IMMUNE TO FILTERS
   const globalRawList = allProjects || [];
-  const queueCount = globalRawList.filter(d => d["Last Status"] && d["Last Status"].trim().toLowerCase() === "on queue").length;
+  const queueProjectsPool = useMemo(() => {
+    return globalRawList.filter(item => {
+      const status = item["Last Status"] ? item["Last Status"].trim().toLowerCase() : "";
+      const ticketNumber = String(item["No Ticket"] || item["Ticket"] || "");
 
-  // Progress Count: Filtered dynamically from active month-to-month range, excluding UAT
-  const progressCount = useMemo(() => {
-    return list.filter(p => {
-      const statusLower = (p["Last Status"] || "").trim().toLowerCase();
-      // Strictly exclude "uat on progress" and "uat on queue"
-      if (statusLower === "uat on progress" || statusLower === "uat on queue") {
+      // Rule: Must be strictly "On Queue" and must NOT be a new 2026 project entry
+      return (status === "on queue" || status === "queue") && !ticketNumber.startsWith("26");
+    });
+  }, [globalRawList]);
+
+  const queueCount = queueProjectsPool.length;
+
+  // Progress Count: Filtered dynamically from active month-to-month range, excluding UAT and strictly excluding Live status
+  const cleanInProgressPool = useMemo(() => {
+    const rawData = (window as any).rawMasterDataset || globalRawList || list || [];
+    return getBusinessOperationalData(rawData).filter(item => {
+      const lastStatus = item["Last Status"] ? item["Last Status"].trim().toLowerCase() : "";
+      const fsdStatus = item["(FSD) Status"] ? item["(FSD) Status"].trim().toLowerCase() : "";
+      const devStatus = item["(Dev) Status"] ? item["(Dev) Status"].trim().toLowerCase() : "";
+      const sitStatus = item["(SIT) Status"] ? item["(SIT) Status"].trim().toLowerCase() : "";
+      const crStatus = item["(Change Request) Status"] ? item["(Change Request) Status"].trim().toLowerCase() : "";
+
+      // RULE A: STRICT EXCLUSION - If project is already Live, it is NO LONGER In Progress
+      if (lastStatus.includes("live")) {
         return false;
       }
-      return statusLower === "fsd on progress" ||
-             statusLower === "dev on progress" ||
-             statusLower === "sit on progress" ||
-             statusLower === "change request on progress" ||
-             statusGroupOf(p["Last Status"]) === "Dalam Proses";
-    }).length;
-  }, [list]);
+
+      // RULE B: INCLUSION - Capture active sub-stages
+      return (
+        fsdStatus === "on progress" || fsdStatus.includes("progress") ||
+        devStatus === "on progress" || devStatus.includes("progress") ||
+        sitStatus === "on progress" || sitStatus.includes("progress") ||
+        crStatus === "on progress" || lastStatus.includes("change request on progress")
+      );
+    });
+  }, [globalRawList, list]);
+
+  const activeInProgressPool = cleanInProgressPool;
+
+  const progressCount = activeInProgressPool.length;
 
   const uatCount = kpis[2]?.value ?? 0;
   const monitoringCount = kpis[3]?.value ?? 0;
@@ -607,22 +706,20 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
   const feedbackMetrics = useMemo(() => {
     const filteredData = list;
     
-    // 1. Filter projects that have valid feedback in the current scope
-    let projectsWithFeedback = filteredData.filter(d => {
-      let score = parseFloat(String(d["Rata-rata Nilai Feedback User : "]));
-      return !isNaN(score) && score > 0;
+    let totalScoreOfActive = 0;
+    let activeWithFeedbackCount = 0;
+
+    filteredData.forEach(item => {
+      const avg = calculateProjectAverageScore(item);
+      if (avg !== null) {
+        totalScoreOfActive += avg;
+        activeWithFeedbackCount++;
+      }
     });
 
-    // 2. Calculate average out of 5 (divide by 20 because raw data is out of 100)
     let globalAvg = "0.00";
-    if (projectsWithFeedback.length > 0) {
-      let totalScoreOutof100 = projectsWithFeedback.reduce((sum, d) => sum + parseFloat(String(d["Rata-rata Nilai Feedback User : "])), 0);
-      let avgOutof100 = totalScoreOutof100 / projectsWithFeedback.length;
-      if (avgOutof100 > 5) {
-        globalAvg = (avgOutof100 / 20).toFixed(2); // Converts 100-scale to 5-scale
-      } else {
-        globalAvg = avgOutof100.toFixed(2);
-      }
+    if (activeWithFeedbackCount > 0) {
+      globalAvg = (totalScoreOfActive / activeWithFeedbackCount).toFixed(2);
     }
 
     let scopeProjects = filteredData.filter(d => {
@@ -631,13 +728,11 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
     });
 
     let withFeedback = scopeProjects.filter(d => {
-      const val = d["Rata-rata Nilai Feedback User : "];
-      return val !== undefined && val !== null && parseFloat(String(val)) > 0;
+      return calculateProjectAverageScore(d) !== null;
     });
 
     let missingFeedback = scopeProjects.filter(d => {
-      const val = d["Rata-rata Nilai Feedback User : "];
-      return val === undefined || val === null || parseFloat(String(val)) === 0 || isNaN(parseFloat(String(val)));
+      return calculateProjectAverageScore(d) === null;
     });
 
     return {
@@ -646,7 +741,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
       missingFeedback,
       averageScore: parseFloat(globalAvg),
       scoreText: globalAvg,
-      filledStars: Math.round(parseFloat(globalAvg))
+      filledStars: parseFloat(globalAvg) === 0 ? 0 : Math.round(parseFloat(globalAvg))
     };
   }, [list]);
 
@@ -654,7 +749,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
 
   // 2. COUNTERS RE-LINKED TO THE DYNAMIC FILTERED DATASET WITH 2026/DATES ADJUSTMENTS
   const evaluatedProjs = useMemo(() => {
-    return list.filter((p) =>
+    return getActiveSlaPool(list).filter((p) =>
       ["FSD SLA", "DEV SLA", "SIT SLA", "UAT SLA", "Live SLA"].some(
         (f) => p[f] === "Achieved" || p[f] === "Not Achieved"
       )
@@ -671,8 +766,8 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
 
   // SLA Total 2026: count projects with Year 2026 and at least one Active / Achieved SLA
   const slaTotal2026Projs = useMemo(() => {
-    return list.filter((p) => {
-      const is2026 = p._year === "2026" || p["Year"] === 2026;
+    return getActiveSlaPool(list).filter((p) => {
+      const is2026 = getProjectIntakeYear(p) === "2026";
       const isAchieved = p["Live SLA"] === "Achieved" || p["DEV SLA"] === "Achieved" || p["UAT SLA"] === "Achieved" || p["FSD SLA"] === "Achieved" || p["SIT SLA"] === "Achieved";
       return is2026 && isAchieved;
     });
@@ -700,49 +795,13 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
   }, [list]);
 
   const getProjectDisplayDate = (p: any): string => {
-    const status = (p["Last Status"] || "").toString().trim().toLowerCase();
-    const milestone = (p["Milestone"] || "").toString().trim().toLowerCase();
-    const isHold = status.includes("hold") || milestone.includes("hold");
-
-    if (isHold) {
-       return p["(Live) Realized in date"] || p["(UAT) Realized In Date"] || p["(Dev) Realized In Date"] || p["(FSD) Realized in Date Diisi saat Approval Digital FSD by Owner selesai"] || "—";
-    }
-    const g = statusGroupOf(p["Last Status"]);
-    if (g === "Antrian") {
-      return p["Created time"] || "—";
-    }
-    if (g === "UAT") {
-      return p["(UAT) Realized In Date"] || p["(UAT) Plan in Week"] || "—";
-    }
-    if (g === "Monitoring" || g === "Live") {
-      return p["(Live) Realized in date"] || p["(Live) Plan in Week"] || "—";
-    }
-    if (g === "Dalam Proses") {
-      if (status.includes("fsd")) {
-        return p["(FSD) Realized in Date Diisi saat Approval Digital FSD by Owner selesai"] || p["(FSD) Plan in Week"] || "—";
-      }
-      if (status.includes("sit")) {
-        return p["(SIT) Realized in date"] || p["(SIT) Plan in Week"] || "—";
-      }
-      return p["(Dev) Realized In Date"] || p["(Dev) Plan in Week"] || "—";
-    }
-    return p["(Live) Realized in date"] || p["(UAT) Realized In Date"] || p["(Dev) Realized In Date"] || "—";
+    const d = getGlobalProjectDate(p);
+    return d === "-" ? "—" : d;
   };
 
   const getTargetOrRealizedDate = (p: any, stageName: string): string => {
-    const s = stageName.toUpperCase();
-    if (s === "FSD") {
-      return p["(FSD) Realized in Date Diisi saat Approval Digital FSD by Owner selesai"] || p["(FSD) Plan in Week"] || "—";
-    } else if (s === "DEV" || s === "DEVELOPMENT") {
-      return p["(Dev) Realized In Date"] || p["(Dev) Plan in Week"] || "—";
-    } else if (s === "SIT") {
-      return p["(SIT) Realized in date"] || p["(SIT) Plan in Week"] || "—";
-    } else if (s === "UAT") {
-      return p["(UAT) Realized In Date"] || p["(UAT) Plan in Week"] || "—";
-    } else if (s === "LIVE") {
-      return p["(Live) Realized in date"] || p["(Live) Plan in Week"] || "—";
-    }
-    return "—";
+    const d = getGlobalProjectDate(p);
+    return d === "-" ? "—" : d;
   };
 
   const slaFieldMap: Record<string, "FSD SLA" | "DEV SLA" | "SIT SLA" | "UAT SLA" | "Live SLA"> = {
@@ -853,8 +912,8 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           </span>
         </div>
 
-        {/* 4 small horizontal KPI tags matching Card info styles in Image 1 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 flex-1">
+        {/* 3 small horizontal KPI tags matching Card info styles */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 flex-1">
           {/* Tag 1: Proyek dievaluasi - CLICKABLE */}
           <div
             onClick={() => setActiveModal({
@@ -889,24 +948,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
             </span>
           </div>
 
-          {/* Tag 3: SLA total 2026 - CLICKABLE */}
-          <div
-            onClick={() => setActiveModal({
-              title: "SLA Accomplished 2026 Projects",
-              projects: slaTotal2026Projs,
-              type: "contributors"
-            })}
-            className="bg-blue-50/50 border border-blue-100/50 rounded-2xl p-3.5 flex flex-col justify-between cursor-pointer hover:bg-blue-50 hover:shadow-xs transition-all select-none group"
-          >
-            <span className="text-2xl font-extrabold text-blue-700 font-mono tracking-tight leading-none group-hover:scale-105 transition-transform origin-left block">
-              {slaTotal2026Projs.length}
-            </span>
-            <span className="text-[11px] text-gray-500 font-semibold uppercase tracking-wider block mt-2.5 leading-tight">
-              SLA Total 2026
-            </span>
-          </div>
-
-          {/* Tag 4: Perlu perhatian - CLICKABLE */}
+          {/* Tag 3: Perlu perhatian - CLICKABLE */}
           <div
             onClick={() => setActiveModal({
               title: "Needs Attention Projects",
@@ -1041,7 +1083,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           </div>
           <div className="mt-4 border-t border-gray-50 pt-3.5 flex items-center justify-between">
             <span className="text-[11px] text-gray-400 font-medium leading-normal">
-              <strong className="text-gray-700">{kpis[4]?.split?.[0]?.value || 0}</strong> Owner &bull; <strong className="text-gray-700">{kpis[4]?.split?.[1]?.value || 0}</strong> Client
+              <strong className="text-gray-700">{kpis[4]?.split?.[0]?.value || 0}</strong> Owner &bull; <strong className="text-gray-700">{kpis[4]?.split?.[1]?.value || 0}</strong> Client/Vendor
             </span>
             <span className="text-[11px] text-blue-600 font-bold group-hover:underline flex items-center gap-0.5">
               View drill-down <Icon name="ChevronRight" className="w-3 h-3" />
@@ -1056,9 +1098,9 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
         sub="SLA milestone achievement rate per stage • SLA FSD–Live 2026"
         padding="p-6 md:p-8"
       >
-        <div className="relative flex flex-col md:flex-row items-center justify-between gap-8 md:gap-4 mt-6">
+        <div className="relative flex flex-col md:flex-row items-center justify-between gap-8 md:gap-8 mt-6">
           {/* Connecting dotted timeline line overlay */}
-          <div className="hidden md:block absolute top-[44px] left-[10%] right-[10%] h-[2px] border-b-2 border-dashed border-gray-200 z-0" />
+          <div className="hidden md:block absolute top-[64px] left-[10%] right-[10%] h-[2px] border-b-2 border-dashed border-gray-200 z-0" />
 
           {dataset.slaStageSummary.map((stage, idx) => {
             // Determine ring color by success percentage
@@ -1078,26 +1120,26 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                 className="flex flex-col items-center flex-1 text-center z-10 w-full md:w-auto cursor-pointer group hover:opacity-90 active:scale-98 transition-all"
               >
                 {/* Visual Circle gauge */}
-                <ProgressCircle pct={stage.pct} color={borderCol} size={88} strokeWidth={8} />
+                <ProgressCircle pct={stage.pct} color={borderCol} size={128} strokeWidth={12} />
 
                 {/* Identifier tag */}
-                <span className="text-[13px] font-extrabold text-gray-800 uppercase tracking-wider font-display mt-3.5 block group-hover:text-blue-600 transition-colors">
+                <span className="text-sm font-bold tracking-wide uppercase text-slate-700 font-display mt-3.5 block group-hover:text-blue-600 transition-colors">
                   {stage.stage}
                 </span>
 
                 {/* SLA Stage Status threshold indicator */}
-                <span className={`text-[10px] font-bold uppercase tracking-wider mt-0.5 block ${statusColor}`}>
+                <span className={`text-xs font-bold tracking-wider uppercase mt-0.5 block ${statusColor}`}>
                   {statusLabel}
                 </span>
 
                 {/* Subtitle status explanation */}
-                <span className={`text-[11.5px] font-medium mt-1 font-sans ${stage.notAch > 0 ? 'text-gray-400' : 'text-emerald-500'}`}>
+                <span className={`text-xs font-medium text-slate-500 mt-0.5 font-sans block`}>
                   {stage.notAch > 0 ? (
                     <span>
-                      <strong className="text-gray-700 font-extrabold">{stage.notAch}</strong> missed
+                      <strong className="text-slate-800 font-extrabold">{stage.notAch}</strong> missed
                     </span>
                   ) : (
-                    "Fully achieved"
+                    <span className="text-emerald-600 font-semibold">Fully achieved</span>
                   )}
                 </span>
               </div>
@@ -1108,12 +1150,13 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
 
       {/* Historical Queue Backlog Trend Card */}
       <Card
-        title="Historical Backlog Burn-Down Trend"
-        sub="Trend analysis of projects currently on queue vs. historical snapshot windows"
+        title="Unified Pipeline Analytics (Dual-Line Chart)"
+        sub="Unified analysis tracking historical backlog burn-down vs. monthly incoming project intakes"
         rightElement={
           <button
             onClick={() => {
               setSelectedHistTab('W3 Apr 26');
+              setModalActiveView('incoming');
               setActiveModal({
                 title: "Historical Queue Snapshot Matrix",
                 type: "historical_queue"
@@ -1122,7 +1165,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
             className="text-[11px] font-extrabold uppercase tracking-wider text-blue-600 bg-blue-50 hover:bg-blue-105 border border-blue-150 rounded-xl px-3 py-1.5 transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
           >
             <Icon name="ListCollapse" className="w-3.5 h-3.5" />
-            <span>View Historical Backlog Log</span>
+            <span>View Unified Queue & Intakes Log</span>
           </button>
         }
         padding="p-6 md:p-8"
@@ -1132,30 +1175,65 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           {/* Main Chart Section */}
           <div className="w-full bg-slate-50/15 border border-gray-150 rounded-2xl p-4 md:p-6 shadow-3xs">
             {(() => {
-              const trendLabels = ["W5 Mar 26", "W1 Apr 26", "W2 Apr 26", "W3 Apr 26", "Current"];
-              const trendValues = [14, 16, 20, 18, queueCount];
-              const yMaxVal = Math.max(22, queueCount + 2);
+              const trendLabels = ["W5 Mar 26", "W1 Apr 26", "W2 Apr 26", "W3 Apr 26", "Current Scope"];
+              const trace1Values = [14, 16, 20, 18, queueCount];
+              const trace2Values = [7, 24, 24, 24, (() => {
+                const emLower = (endMonth || "Dec").toLowerCase();
+                if (emLower.startsWith("mar")) return INCOMING_PROJECTS_DATA["Maret"].length;
+                if (emLower.startsWith("apr")) return INCOMING_PROJECTS_DATA["April"].length;
+                if (emLower.startsWith("may") || emLower.startsWith("mei")) return INCOMING_PROJECTS_DATA["Mei"].length;
+                if (emLower.startsWith("jun")) return INCOMING_PROJECTS_DATA["Juni"].length;
+                return INCOMING_PROJECTS_DATA["Juni"].length;
+              })()];
+              const yMaxVal = Math.max(26, queueCount + 2);
 
-              const linePoints = trendValues.map((v, i) => {
+              const linePoints1 = trace1Values.map((v, i) => {
                 const x = 75 + i * 160;
                 const y = 190 - (v / yMaxVal) * 140; 
                 return { x, y, value: v, label: trendLabels[i] };
               });
 
-              const lineD = `M ${linePoints.map(p => `${p.x},${p.y}`).join(" L ")}`;
-              const areaD = `${lineD} L 715,200 L 75,200 Z`;
+              const linePoints2 = trace2Values.map((v, i) => {
+                const x = 75 + i * 160;
+                const y = 190 - (v / yMaxVal) * 140; 
+                return { x, y, value: v, label: trendLabels[i] };
+              });
+
+              const lineD1 = `M ${linePoints1.map(p => `${p.x},${p.y}`).join(" L ")}`;
+              const areaD1 = `${lineD1} L 715,190 L 75,190 Z`;
+
+              const lineD2 = `M ${linePoints2.map(p => `${p.x},${p.y}`).join(" L ")}`;
+              const areaD2 = `${lineD2} L 715,190 L 75,190 Z`;
 
               return (
                 <svg viewBox="0 0 800 245" className="w-full h-auto block select-none">
                   <defs>
                     <linearGradient id="backlogGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.25" />
+                      <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.22" />
                       <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.00" />
+                    </linearGradient>
+                    <linearGradient id="incomingGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.22" />
+                      <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.00" />
                     </linearGradient>
                   </defs>
 
+                  {/* Legend Indicators */}
+                  <g transform="translate(480, 15)">
+                    {/* Trace 1: Backlog Volume */}
+                    <rect x="0" y="3" width="12" height="6" rx="1.5" fill="#2563EB" />
+                    <text x="18" y="10" className="text-[10px] font-bold fill-gray-500 font-sans">
+                      Backlog Queue
+                    </text>
+                    {/* Trace 2: Incoming Intake */}
+                    <rect x="110" y="3" width="12" height="6" rx="1.5" fill="#8B5CF6" />
+                    <text x="128" y="10" className="text-[10px] font-bold fill-gray-500 font-sans">
+                      New Incoming Intake
+                    </text>
+                  </g>
+
                   {/* Y-Axis Grid Lines and Labels */}
-                  {[0, 5, 10, 15, 20].map((t) => {
+                  {[0, 5, 10, 15, 20, 25].map((t) => {
                     const yPos = 190 - (t / yMaxVal) * 140;
                     return (
                       <g key={t}>
@@ -1168,28 +1246,87 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                   })}
 
                   {/* Vertical grid lines */}
-                  {linePoints.map((p, i) => (
+                  {linePoints1.map((p, i) => (
                     <line key={i} x1={p.x} x2={p.x} y1={40} y2={195} stroke="#F3F4F6" strokeDasharray="2 2" strokeWidth="1" />
                   ))}
 
-                  {/* Shaded Area Under the Line */}
-                  <path d={areaD} fill="url(#backlogGrad)" className="transition-all duration-300" />
+                  {/* Shaded Areas */}
+                  <path d={areaD1} fill="url(#backlogGrad)" className="transition-all duration-300" />
+                  <path d={areaD2} fill="url(#incomingGrad)" className="transition-all duration-300" />
 
-                  {/* Line Path */}
-                  <path d={lineD} fill="none" stroke="#2563EB" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  {/* Line Paths */}
+                  <path d={lineD1} fill="none" stroke="#2563EB" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d={lineD2} fill="none" stroke="#8B5CF6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
-                  {/* Interactive Nodes */}
-                  {linePoints.map((p, i) => {
+                  {/* Explicit Data Labels Trace 1 (Blue - Backlog Queue) */}
+                  {linePoints1.map((p, i) => (
+                    <g key={`lbl1-${i}`} className="pointer-events-none">
+                      <rect
+                        x={p.x - 14}
+                        y={p.y - 25}
+                        width={28}
+                        height={16}
+                        rx={5}
+                        fill="#EFF6FF"
+                        fillOpacity="0.95"
+                        stroke="#BFDBFE"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x={p.x}
+                        y={p.y - 13}
+                        textAnchor="middle"
+                        fontSize="11"
+                        fontWeight="bold"
+                        fontFamily="sans-serif"
+                        className="text-[11px] font-sans font-bold fill-blue-700"
+                      >
+                        {p.value}
+                      </text>
+                    </g>
+                  ))}
+
+                  {/* Explicit Data Labels Trace 2 (Purple - New Incoming Intake) */}
+                  {linePoints2.map((p, i) => (
+                    <g key={`lbl2-${i}`} className="pointer-events-none">
+                      <rect
+                        x={p.x - 14}
+                        y={p.y - 25}
+                        width={28}
+                        height={16}
+                        rx={5}
+                        fill="#F5F3FF"
+                        fillOpacity="0.95"
+                        stroke="#DDD6FE"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x={p.x}
+                        y={p.y - 13}
+                        textAnchor="middle"
+                        fontSize="11"
+                        fontWeight="bold"
+                        fontFamily="sans-serif"
+                        className="text-[11px] font-sans font-bold fill-violet-700"
+                      >
+                        {p.value}
+                      </text>
+                    </g>
+                  ))}
+
+                  {/* Interactive Nodes Trace 1 (Blue) */}
+                  {linePoints1.map((p, i) => {
                     const isHovered = hoveredIdx === i;
                     return (
                       <g
-                        key={i}
+                        key={`t1-${i}`}
                         className="cursor-pointer"
                         onMouseEnter={() => setHoveredIdx(i)}
                         onMouseLeave={() => setHoveredIdx(null)}
                         onClick={() => {
-                          const tabName = p.label === "Current" ? "W3 Apr 26" : p.label as any;
+                          const tabName = p.label === "Current Scope" ? "W3 Apr 26" : p.label as any;
                           setSelectedHistTab(tabName);
+                          setModalActiveView('backlog');
                           setActiveModal({
                             title: "Historical Queue Snapshot Matrix",
                             type: "historical_queue"
@@ -1204,8 +1341,35 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                     );
                   })}
 
+                  {/* Interactive Nodes Trace 2 (Purple) */}
+                  {linePoints2.map((p, i) => {
+                    const isHovered = hoveredIdx === i;
+                    return (
+                      <g
+                        key={`t2-${i}`}
+                        className="cursor-pointer"
+                        onMouseEnter={() => setHoveredIdx(i)}
+                        onMouseLeave={() => setHoveredIdx(null)}
+                        onClick={() => {
+                          const tabName = p.label === "Current Scope" ? "W3 Apr 26" : p.label as any;
+                          setSelectedHistTab(tabName);
+                          setModalActiveView('incoming');
+                          setActiveModal({
+                            title: "Historical Queue Snapshot Matrix",
+                            type: "historical_queue"
+                          });
+                        }}
+                      >
+                        {isHovered && <circle cx={p.x} cy={p.y} r={12} fill="#C084FC" opacity="0.4" />}
+                        <circle cx={p.x} cy={p.y} r={6.5} fill="#8B5CF6" stroke="#FFFFFF" strokeWidth="2" />
+                        <circle cx={p.x} cy={p.y} r={2} fill="#FFFFFF" />
+                        <circle cx={p.x} cy={p.y} r={24} fill="transparent" />
+                      </g>
+                    );
+                  })}
+
                   {/* X-Axis Labels */}
-                  {linePoints.map((p, i) => (
+                  {linePoints1.map((p, i) => (
                     <text
                       key={i}
                       x={p.x}
@@ -1213,8 +1377,10 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                       textAnchor="middle"
                       className="text-[10.5px] font-extrabold fill-gray-500 font-display transition-colors cursor-pointer hover:fill-blue-600"
                       onClick={() => {
-                        const tabName = p.label === "Current" ? "W3 Apr 26" : p.label as any;
+                        const tabName = p.label === "Current Scope" ? "W3 Apr 26" : p.label as any;
                         setSelectedHistTab(tabName);
+                        // If current scale is selected, open incomingRegistry modal tab, otherwise backlog
+                        setModalActiveView(p.label === "Current Scope" ? 'incoming' : 'backlog');
                         setActiveModal({
                           title: "Historical Queue Snapshot Matrix",
                           type: "historical_queue"
@@ -1227,18 +1393,22 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
 
                   {/* SVG Tooltip */}
                   {hoveredIdx !== null && (() => {
-                    const p = linePoints[hoveredIdx];
-                    const tooltipX = Math.max(70, Math.min(730, p.x));
+                    const p1 = linePoints1[hoveredIdx];
+                    const p2 = linePoints2[hoveredIdx];
+                    const tooltipX = Math.max(90, Math.min(710, p1.x));
+                    const tooltipY = Math.min(p1.y, p2.y) - 20;
                     return (
                       <g className="pointer-events-none select-none">
-                        <line x1={p.x} x2={p.x} y1={40} y2={190} stroke="#2563EB" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.6" />
-                        <rect x={tooltipX - 70} y={p.y - 48} width={140} height={40} rx={8} fill="#1E293B" />
-                        <polygon points={`${p.x - 5},${p.y - 8} ${p.x + 5},${p.y - 8} ${p.x},${p.y - 3}`} fill="#1E293B" />
-                        <text x={tooltipX} y={p.y - 34} textAnchor="middle" className="text-[10.5px] font-extrabold fill-slate-200 font-display">
-                          {p.label} Milestone
+                        <line x1={p1.x} x2={p1.x} y1={40} y2={190} stroke="#4B5563" strokeWidth="1" strokeDasharray="3 3" opacity="0.4" />
+                        <rect x={tooltipX - 95} y={tooltipY - 60} width="190" height="56" rx="8" fill="#1E293B" />
+                        <text x={tooltipX} y={tooltipY - 44} textAnchor="middle" className="text-[10.5px] font-extrabold fill-slate-200 font-display">
+                          {p1.label} snapshot
                         </text>
-                        <text x={tooltipX} y={p.y - 21} textAnchor="middle" className="text-[10px] font-bold fill-emerald-400 font-mono">
-                          Queue: {p.value} Projects
+                        <text x={tooltipX} y={tooltipY - 30} textAnchor="middle" className="text-[10px] font-bold fill-blue-400 font-mono">
+                          Backlog Queue: {p1.value} Projects
+                        </text>
+                        <text x={tooltipX} y={tooltipY - 16} textAnchor="middle" className="text-[10px] font-bold fill-purple-400 font-mono">
+                          Incoming Intake: {p2.value} Projects
                         </text>
                       </g>
                     );
@@ -1253,7 +1423,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
         <div className="mt-5 p-4 rounded-xl bg-blue-50/60 border border-blue-150 flex items-start gap-2.5 shadow-3xs hover:bg-blue-50/90 transition-all duration-300">
           <span className="text-blue-500 mt-0.5 shrink-0 text-base leading-none select-none font-sans">ℹ️</span>
           <div className="text-xs text-blue-800 font-medium leading-relaxed whitespace-normal select-text">
-            Info: On Queue Project based on active master data is now <span className="text-blue-900 font-extrabold font-mono underline">{queueCount}</span>, compared to <span className="text-blue-950 font-extrabold font-mono underline">18</span> from the historical snapshot baseline.
+            Info: On Queue Project based on active master data is now <span className="text-blue-900 font-extrabold font-mono underline">{queueCount}</span> projects, compared to 18 projects from the historical snapshot baseline. Total new incoming project intakes for the active period are cleanly archived below.
           </div>
         </div>
       </Card>
@@ -1323,7 +1493,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
         <div
           onClick={() => {
             setActiveModal({
-              title: "Delayed UAT Projects Audit",
+              title: "Delayed UAT Projects Review",
               type: "uat_delay_audit",
               projects: delayedUATProjects
             });
@@ -1339,7 +1509,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
             </span>
           </div>
           <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-150/50 rounded-lg px-2 py-0.5 transition-colors group-hover:bg-rose-200 select-none flex-shrink-0">
-            View Audit List &rarr;
+            View Review List &rarr;
           </span>
         </div>
       </Card>
@@ -1451,98 +1621,117 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
       </Card>
 
       {/* RENDER DYNAMIC DRILL-DOWN MODALS - DELAYED UAT PROJECTS AUDIT */}
-      {activeModal && activeModal.type === 'uat_delay_audit' && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden transform scale-100 animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="p-5 border-b border-gray-150 flex items-center justify-between bg-gray-50/55 select-none">
-              <div>
-                <h3 className="text-base font-extrabold text-gray-900 font-display">
-                  Delayed UAT Projects Audit
-                </h3>
-                <p className="text-xs text-gray-400 font-medium mt-1">
-                  Showing {(activeModal.projects || []).length} active UAT delayed / rescheduled projects requiring escalation
-                </p>
-              </div>
-              <button
-                onClick={() => setActiveModal(null)}
-                className="text-gray-400 hover:text-gray-600 p-1.5 hover:bg-gray-105 rounded-xl transition-colors cursor-pointer text-sm"
-              >
-                ✕
-              </button>
-            </div>
+      {activeModal && activeModal.type === 'uat_delay_audit' && (() => {
+        const renderChronologicalProgress = (notes: string) => {
+          if (!notes || notes === "—") return "-";
+          return notes
+            .split(/(?=\d{1,2}\s+(?:Jan|Feb|Mar|Apr|Mei|Jun|Jul|Agu|Sep|Okt|Nov|Des)\s+\d{2,4}\s+:\s+)/gi)
+            .filter(line => line.trim() !== "")
+            .map(line => `<div class="mb-1.5">• ${line.trim()}</div>`)
+            .join("");
+        };
 
-            {/* Structured Table */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="overflow-x-auto border border-gray-150 rounded-2xl shadow-xs">
-                <table className="w-full text-left text-xs border-collapse divide-y divide-gray-150">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-150 text-[10.5px] text-gray-400 font-bold uppercase tracking-wider font-display select-none">
-                      <th className="py-3 px-4">Ticket &amp; Project Name</th>
-                      <th className="py-3 px-3">PIC Name</th>
-                      <th className="py-3 px-3">Current Stage Status</th>
-                      <th className="py-3 px-3 text-center">Reschedule Count</th>
-                      <th className="py-3 px-3 text-center">Delayed Days</th>
-                      <th className="py-3 px-4 w-[35%]">Progress Update Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-105 select-text bg-white">
-                    {(activeModal.projects || []).map((p, idx) => {
-                      const reschedCount = p["Reschedule UAT"] || 0;
-                      const lateDays = p._lateUAT || 0;
-                      const progressNotes = p["(UAT) Progress Updated"] || "—";
-                      return (
-                        <tr key={idx} className="hover:bg-gray-50/40 transition-colors">
-                          <td className="py-3 px-4 font-sans align-top whitespace-normal break-words">
-                            <p className="font-bold text-gray-900 text-xs whitespace-normal break-words">{p["Project Name"] || "—"}</p>
-                            <span className="font-mono text-[10px] text-gray-400 mt-1 block whitespace-normal break-words">{p["Ticket"] || "—"}</span>
-                          </td>
-                          <td className="py-3 px-3 font-sans font-semibold text-gray-750 align-top whitespace-normal break-words">
-                            {p["PIC Short Name"] || p["PIC Name"] || "—"}
-                          </td>
-                          <td className="py-3 px-3 align-top whitespace-normal break-words">
-                            <span className="inline-block px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-amber-50 text-amber-700 border border-amber-100 select-none whitespace-normal break-normal">
-                              {p["Last Status"] || "Unknown"}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-center font-mono font-extrabold text-xs text-gray-950 align-top select-none whitespace-normal break-words">
-                            {reschedCount > 0 ? `${reschedCount}×` : "0"}
-                          </td>
-                          <td className="py-3 px-3 text-center align-top whitespace-normal break-words select-none">
-                            <span className={`inline-block font-mono font-black text-xs px-2 py-0.5 rounded-lg ${lateDays > 0 ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-gray-100 text-gray-600'}`}>
-                              {lateDays} Days
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-xs font-medium text-gray-650 leading-relaxed align-top whitespace-normal break-words select-text">
-                            {progressNotes}
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden transform scale-100 animate-in fade-in zoom-in-95 duration-150">
+              {/* Header */}
+              <div className="p-5 border-b border-gray-150 flex items-center justify-between bg-gray-50/55 select-none">
+                <div>
+                  <h3 className="text-base font-extrabold text-gray-900 font-display">
+                    Delayed UAT Projects Review
+                  </h3>
+                  <p className="text-xs text-gray-400 font-medium mt-1">
+                    Showing {(activeModal.projects || []).length} active UAT delayed / rescheduled projects requiring escalation
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveModal(null)}
+                  className="text-gray-400 hover:text-gray-600 p-1.5 hover:bg-gray-105 rounded-xl transition-colors cursor-pointer text-sm"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Structured Table */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="overflow-x-auto border border-gray-150 rounded-2xl shadow-xs">
+                  <table className="w-full text-left text-xs border-collapse divide-y divide-gray-150">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-150 text-[10.5px] text-gray-400 font-bold uppercase tracking-wider font-display select-none">
+                        <th className="py-3 px-4">Ticket &amp; Project Name</th>
+                        <th className="py-3 px-3">PIC Name</th>
+                        <th className="py-3 px-3">Owner Division</th>
+                        <th className="py-3 px-3">Owner Name</th>
+                        <th className="py-3 px-3">Current Stage Status</th>
+                        <th className="py-3 px-3 text-center">Reschedule Count</th>
+                        <th className="py-3 px-3 text-center">Delayed Days</th>
+                        <th className="py-3 px-4 w-[35%]">Progress Update Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-105 select-text bg-white">
+                      {(activeModal.projects || []).map((p, idx) => {
+                        const reschedCount = p["Reschedule UAT"] || 0;
+                        const lateDays = p._lateUAT || 0;
+                        const progressNotes = p["(UAT) Progress Updated"] || "—";
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50/40 transition-colors">
+                            <td className="py-3 px-4 font-sans align-top whitespace-normal break-words">
+                              <p className="font-bold text-gray-900 text-xs whitespace-normal break-words">{p["Project Name"] || "—"}</p>
+                              <span className="font-mono text-[10px] text-gray-400 mt-1 block whitespace-normal break-words">{p["Ticket"] || "—"}</span>
+                            </td>
+                            <td className="py-3 px-3 font-sans font-semibold text-gray-750 align-top whitespace-normal break-words">
+                              {p["PIC Short Name"] || p["PIC Name"] || "—"}
+                            </td>
+                            <td className="py-3 px-3 text-xs font-medium text-slate-600 align-top whitespace-normal break-words">
+                              {p["Owner Div"] || "—"}
+                            </td>
+                            <td className="py-3 px-3 text-xs font-medium text-slate-600 align-top whitespace-normal break-words">
+                              {p["Owner Name"] || "—"}
+                            </td>
+                            <td className="py-3 px-3 align-top whitespace-normal break-words">
+                              <span className="inline-block px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-amber-50 text-amber-700 border border-amber-100 select-none whitespace-normal break-normal">
+                                {p["Last Status"] || "Unknown"}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono font-extrabold text-xs text-gray-950 align-top select-none whitespace-normal break-words">
+                              {reschedCount > 0 ? `${reschedCount}×` : "0"}
+                            </td>
+                            <td className="py-3 px-3 text-center align-top whitespace-normal break-words select-none">
+                              <span className={`inline-block font-mono font-black text-xs px-2 py-0.5 rounded-lg ${lateDays > 0 ? 'bg-rose-50 text-rose-700 border border-rose-100' : 'bg-gray-100 text-gray-600'}`}>
+                                {lateDays} Days
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-xs font-medium text-gray-650 leading-relaxed align-top whitespace-normal break-words select-text">
+                              <div className="whitespace-normal text-xs leading-relaxed text-slate-700 bg-slate-50/55 p-3 rounded-md border border-slate-100 max-h-[150px] overflow-y-auto block" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(progressNotes) }} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(activeModal.projects || []).length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="py-12 text-center text-xs text-gray-400 font-semibold italic">
+                            No delayed UAT projects identified.
                           </td>
                         </tr>
-                      );
-                    })}
-                    {(activeModal.projects || []).length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-xs text-gray-400 font-semibold italic">
-                          No delayed UAT projects identified.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-gray-150 flex justify-end bg-gray-50/55 select-none">
+                <button
+                  onClick={() => setActiveModal(null)}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  Close Review List
+                </button>
               </div>
             </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-150 flex justify-end bg-gray-50/55 select-none">
-              <button
-                onClick={() => setActiveModal(null)}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                Close Audit List
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* RENDER DYNAMIC DRILL-DOWN MODALS - USER SATISFACTION FEEDBACK */}
       {activeModal && activeModal.type === 'feedback' && (
@@ -1647,13 +1836,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                   <tbody className="divide-y divide-gray-105 select-text">
                     {activeModal.projects.map((p, idx) => {
                       const comments = getFeedbackComments(p);
-                      const rawScore = p["Rata-rata Nilai Feedback User : "];
-                      const hasFeedback = rawScore !== undefined && rawScore !== null && parseFloat(String(rawScore)) > 0;
-                      let scoreValue = null;
-                      if (hasFeedback) {
-                        const parsedNum = parseFloat(String(rawScore));
-                        scoreValue = (parsedNum > 5 ? parsedNum / 20 : parsedNum).toFixed(2);
-                      }
+                      const avgScore = calculateProjectAverageScore(p);
                       return (
                         <tr key={idx} className="hover:bg-gray-50/[15] transition-colors">
                           <td className="py-4 px-4 font-sans align-top">
@@ -1665,49 +1848,54 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                           </td>
                           <td className="py-4 px-3 align-top whitespace-normal">
                             {(() => {
-                              const lastStatusRaw = p["Last Status"] || "";
-                              const lastStatusLower = lastStatusRaw.trim().toLowerCase();
-                              let badgeClass = "text-slate-650 bg-slate-50 border-slate-150";
-                              
-                              if (lastStatusLower.includes("live") || lastStatusLower.includes("live monitoring")) {
-                                badgeClass = "text-emerald-750 bg-emerald-50 border-emerald-150";
-                              } else if (lastStatusLower.includes("uat")) {
-                                badgeClass = "text-blue-750 bg-blue-50 border-blue-150";
-                              } else if (lastStatusLower.includes("change request") || lastStatusLower.includes("progress")) {
-                                badgeClass = "text-amber-750 bg-amber-50 border-amber-150";
-                              }
+                               const lastStatusRaw = p["Last Status"] || "";
+                               const lastStatusLower = lastStatusRaw.trim().toLowerCase();
+                               let badgeClass = "text-slate-650 bg-slate-50 border-slate-150";
+                               
+                               if (lastStatusLower.includes("live") || lastStatusLower.includes("live monitoring")) {
+                                 badgeClass = "text-emerald-750 bg-emerald-50 border-emerald-150";
+                               } else if (lastStatusLower.includes("uat")) {
+                                 badgeClass = "text-blue-750 bg-blue-50 border-blue-150";
+                               } else if (lastStatusLower.includes("change request") || lastStatusLower.includes("progress")) {
+                                 badgeClass = "text-amber-750 bg-amber-50 border-amber-150";
+                               }
 
-                              return (
-                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase font-mono border whitespace-nowrap ${badgeClass}`}>
-                                  {lastStatusRaw || "—"}
-                                </span>
-                              );
+                               return (
+                                 <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase font-mono border whitespace-nowrap ${badgeClass}`}>
+                                   {lastStatusRaw || "—"}
+                                 </span>
+                               );
                             })()}
                           </td>
                           <td className="py-4 px-3 text-center align-top">
-                            {scoreValue ? (
+                            {avgScore !== null ? (
                               <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold font-mono text-amber-800 bg-amber-50 border border-amber-100">
-                                ⭐ {scoreValue}
+                                ⭐ {avgScore.toFixed(2)}
                               </span>
                             ) : (
-                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold font-mono text-gray-400 bg-gray-50 border border-gray-105 uppercase">
+                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold font-mono text-gray-400 bg-gray-50 border border-gray-105 uppercase select-none">
                                 —
                               </span>
                             )}
                           </td>
                           <td className="py-4 px-4 text-xs text-gray-650 align-top">
-                            {hasFeedback ? (
-                              comments.length > 0 ? (
-                                <div className="space-y-1.5">
-                                  {comments.map((comment, cIdx) => (
-                                    <p key={cIdx} className="italic text-gray-600 leading-relaxed bg-gray-50/50 p-2.5 rounded-xl border border-gray-100">
-                                      &ldquo;{comment}&rdquo;
-                                    </p>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-gray-450 italic">No feedback text comments recorded</span>
-                              )
+                            {avgScore !== null ? (
+                              <div className="space-y-2">
+                                <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium bg-emerald-50 border border-emerald-150 px-3 py-2 rounded-xl text-[11px] w-full">
+                                  ✅ Feedback Form Completed
+                                </span>
+                                {comments.length > 0 ? (
+                                  <div className="space-y-1.5 pl-1">
+                                    {comments.map((comment, cIdx) => (
+                                      <p key={cIdx} className="italic text-gray-600 leading-relaxed bg-gray-50/50 p-2.5 rounded-xl border border-gray-100">
+                                        &ldquo;{comment}&rdquo;
+                                      </p>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-gray-450 italic text-[11px] pl-1">No feedback text comments recorded</p>
+                                )}
+                              </div>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 text-amber-600/90 font-medium italic bg-amber-50/40 border border-amber-105 px-3 py-2 rounded-xl text-[11px] w-full">
                                 ⚠️ No feedback submitted
@@ -2044,6 +2232,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
       })()}
 
       {/* RENDER DYNAMIC DRILL-DOWN MODALS - HISTORICAL snapshot queue metadata */}
+       {/* RENDER DYNAMIC DRILL-DOWN MODALS - HISTORICAL snapshot queue metadata */}
       {activeModal && activeModal.type === 'historical_queue' && (() => {
         const getHistoricalQueueRows = () => {
           const rows = HISTORICAL_QUEUE_SNAPSHOT.slice(1);
@@ -2160,37 +2349,67 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           };
         };
 
+        const incomingList = INCOMING_PROJECTS_DATA[selectedIncomingMonth] || [];
+
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-[92vw] max-w-7xl h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden transform scale-100">
               {/* Header */}
-              <div className="p-5 border-b border-gray-150 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/55 select-none">
+              <div className="p-5 border-b border-gray-150 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/55 select-none hover:shadow-2xs transition-shadow duration-155">
                 <div>
                   <h3 className="text-base font-extrabold text-gray-900 font-display">
                     {activeModal.title}
                   </h3>
                   <p className="text-xs text-gray-400 font-medium mt-1">
-                    Static Backlog Snapshots &bull; {currentRows.length} projects active in <span className="font-extrabold text-blue-600 font-mono">{selectedHistTab}</span>
+                    {modalActiveView === 'backlog' ? (
+                      <>Static Backlog Snapshots &bull; {currentRows.length} projects active in <span className="font-extrabold text-blue-600 font-mono">{selectedHistTab}</span></>
+                    ) : (
+                      <>Incoming Registries &bull; {incomingList.length} new intakes archive for <span className="font-extrabold text-purple-600 font-mono">{selectedIncomingMonth}</span></>
+                    )}
                   </p>
                 </div>
 
-                {/* Tabbed Navigation inside snapshot modal */}
-                <div className="flex bg-gray-100 p-1 rounded-xl self-start md:self-center">
-                  {(['W5 Mar 26', 'W1 Apr 26', 'W2 Apr 26', 'W3 Apr 26'] as const).map((tab) => {
-                    const isActive = selectedHistTab === tab;
-                    return (
-                      <button
-                        key={tab}
-                        onClick={() => setSelectedHistTab(tab)}
-                        className={`px-3 py-1.5 text-xs font-extrabold rounded-lg cursor-pointer transition-all ${
-                          isActive ? "bg-white text-blue-700 shadow-xs border border-gray-200/40" : "text-gray-500 hover:text-gray-900"
-                        }`}
-                      >
-                        {tab}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Sub-Tabs Selector based on current Active view Segment */}
+                {modalActiveView === 'backlog' ? (
+                  <div className="flex bg-gray-100 p-1 rounded-xl self-start md:self-center">
+                    {(['W5 Mar 26', 'W1 Apr 26', 'W2 Apr 26', 'W3 Apr 26'] as const).map((tab) => {
+                      const isActive = selectedHistTab === tab;
+                      return (
+                        <button
+                          key={tab}
+                          onClick={() => setSelectedHistTab(tab)}
+                          className={`px-3 py-1.5 text-xs font-extrabold rounded-lg cursor-pointer transition-all ${
+                            isActive ? "bg-white text-blue-700 shadow-xs border border-gray-200/40" : "text-gray-500 hover:text-gray-900"
+                          }`}
+                        >
+                          {tab}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex bg-gray-100 p-1 rounded-xl self-start md:self-center">
+                    {([
+                      { key: "Maret", label: "March (7)" },
+                      { key: "April", label: "April (24)" },
+                      { key: "Mei", label: "May (9)" },
+                      { key: "Juni", label: "June (6)" }
+                    ] as const).map(({ key, label }) => {
+                      const isActive = selectedIncomingMonth === key;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setSelectedIncomingMonth(key)}
+                          className={`px-3 py-1.5 text-xs font-extrabold rounded-lg cursor-pointer transition-all ${
+                            isActive ? "bg-white text-purple-700 shadow-xs border border-gray-200/40" : "text-gray-500 hover:text-gray-900"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <button
                   onClick={() => setActiveModal(null)}
@@ -2200,85 +2419,163 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                 </button>
               </div>
 
-              {/* Informative description banner */}
-              <div className="bg-slate-50/80 border border-slate-150 p-4 rounded-xl mx-6 mt-4 flex items-start gap-2.5">
-                <span className="text-slate-500 mt-0.5 shrink-0 text-base leading-none">📋</span>
-                <div className="text-xs text-slate-700 font-semibold leading-relaxed whitespace-normal select-text">
-                  <strong>Snapshot Data Scope:</strong> This view logs the static historical projects from the baseline raw queue. Long descriptive fields wrap seamlessly to guarantee absolute readability across systems.
-                </div>
+              {/* View Selector segmented control tab bar */}
+              <div className="flex px-6 pt-3 border-b border-gray-150 gap-6 bg-white select-none">
+                <button
+                  onClick={() => setModalActiveView('backlog')}
+                  className={`pb-3 text-xs uppercase tracking-wider font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                    modalActiveView === 'backlog'
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  <Icon name="Layers" className="w-3.5 h-3.5" />
+                  <span>[Backlog Queue History]</span>
+                </button>
+                <button
+                  onClick={() => setModalActiveView('incoming')}
+                  className={`pb-3 text-xs uppercase tracking-wider font-extrabold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                    modalActiveView === 'incoming'
+                      ? 'border-purple-600 text-purple-600'
+                      : 'border-transparent text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  <Icon name="Inbox" className="w-3.5 h-3.5" />
+                  <span>[New Incoming Projects Registry]</span>
+                </button>
               </div>
 
-              {/* Dynamic Department Summary Cards with High Contrast */}
-              <div className="grid grid-cols-5 gap-2 mx-6 mt-2 select-none">
-                {Object.entries(departmentAggregator)
-                  .filter(([_, count]) => count > 0)
-                  .map(([deptName, count]) => {
-                    const styles = getDeptStyles(deptName);
-                    return (
-                      <div
-                        key={deptName}
-                        className={`py-1.5 px-3 h-11 rounded-lg border ${styles.border} ${styles.bg} shadow-3xs flex items-center justify-between gap-2 transition-all hover:shadow-2xs min-w-0`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Icon name={styles.icon} className={`w-3.5 h-3.5 ${styles.numText} shrink-0`} />
-                          <p className={`text-[10px] font-bold tracking-tight uppercase truncate ${styles.text}`} title={deptName}>
-                            {deptName}
-                          </p>
-                        </div>
-                        <div className="shrink-0 flex items-center gap-1">
-                          <span className={`text-xs font-black font-mono leading-none ${styles.numText}`}>
-                            {count}
-                          </span>
-                          <span className="text-[8px] uppercase font-bold text-gray-400 tracking-wide leading-none">
-                            {count === 1 ? "Prj" : "Prjs"}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
+              {modalActiveView === 'backlog' ? (
+                <>
+                  {/* Informative description banner */}
+                  <div className="bg-slate-50/80 border border-slate-150 p-4 rounded-xl mx-6 mt-4 flex items-start gap-2.5">
+                    <span className="text-slate-500 mt-0.5 shrink-0 text-base leading-none">📋</span>
+                    <div className="text-xs text-slate-700 font-semibold leading-relaxed whitespace-normal select-text">
+                      <strong>Snapshot Data Scope:</strong> This view logs the static historical projects from the baseline raw queue. Long descriptive fields wrap seamlessly to guarantee absolute readability across systems.
+                    </div>
+                  </div>
 
-              {/* Snapshot Table */}
-              <div className="flex-1 overflow-y-auto overflow-x-auto mt-4 border border-slate-200 rounded-lg mx-6 mb-6 select-text">
-                <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-150 text-[10.5px] text-gray-405 font-bold uppercase tracking-wider font-display select-none">
-                        <th className="py-3 px-4 w-[10%] text-center">Row ID</th>
-                        <th className="py-3 px-4 w-[15%]">Ticket</th>
-                        <th className="py-3 px-4 w-[40%] min-w-[200px]">Project Name</th>
-                        <th className="py-3 px-3 w-[15%]">PIC Name</th>
-                        <th className="py-3 px-3 w-[10%]">Owner</th>
-                        <th className="py-3 px-4 w-[10%]">Department</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 select-text">
-                      {currentRows.map((r, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
-                          <td className="py-3 px-4 text-center font-mono font-bold text-gray-400">
-                            {r.id}
-                          </td>
-                          <td className="py-3 px-4 font-mono font-bold text-gray-600 text-[11px]">
-                            {r.ticket}
-                          </td>
-                          {/* Force project name to wrap completely with whitespace-normal and break-words */}
-                          <td className="py-3 px-4 text-gray-950 font-bold whitespace-normal break-words" style={{ minWidth: "200px" }} title={r.projectName}>
-                            {r.projectName}
-                          </td>
-                          <td className="py-3 px-3 text-gray-600 font-semibold">
-                            {r.picName}
-                          </td>
-                          <td className="py-3 px-3 text-gray-500 font-semibold">
-                            {r.owner}
-                          </td>
-                          {/* Force department/division to wrap completely with whitespace-normal and break-words */}
-                          <td className="py-3 px-4 text-gray-500 font-semibold whitespace-normal break-words">
-                            {r.department}
-                          </td>
+                  {/* Dynamic Department Summary Cards with High Contrast */}
+                  <div className="grid grid-cols-5 gap-2 mx-6 mt-2 select-none">
+                    {Object.entries(departmentAggregator)
+                      .filter(([_, count]) => count > 0)
+                      .map(([deptName, count]) => {
+                        const styles = getDeptStyles(deptName);
+                        return (
+                          <div
+                            key={deptName}
+                            className={`py-1.5 px-3 h-11 rounded-lg border ${styles.border} ${styles.bg} shadow-3xs flex items-center justify-between gap-2 transition-all hover:shadow-2xs min-w-0`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Icon name={styles.icon} className={`w-3.5 h-3.5 ${styles.numText} shrink-0`} />
+                              <p className={`text-[10px] font-bold tracking-tight uppercase truncate ${styles.text}`} title={deptName}>
+                                {deptName}
+                              </p>
+                            </div>
+                            <div className="shrink-0 flex items-center gap-1">
+                              <span className={`text-xs font-black font-mono leading-none ${styles.numText}`}>
+                                {count}
+                              </span>
+                              <span className="text-[8px] uppercase font-bold text-gray-400 tracking-wide leading-none">
+                                {count === 1 ? "Prj" : "Prjs"}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Snapshot Table */}
+                  <div className="flex-1 overflow-y-auto overflow-x-auto mt-4 border border-slate-200 rounded-lg mx-6 mb-6 select-text">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-150 text-[10.5px] text-gray-405 font-bold uppercase tracking-wider font-display select-none">
+                          <th className="py-3 px-4 w-[10%] text-center">Row ID</th>
+                          <th className="py-3 px-4 w-[15%]">Ticket</th>
+                          <th className="py-3 px-4 w-[40%] min-w-[200px]">Project Name</th>
+                          <th className="py-3 px-3 w-[15%]">PIC Name</th>
+                          <th className="py-3 px-3 w-[10%]">Owner</th>
+                          <th className="py-3 px-4 w-[10%]">Department</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-              </div>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 select-text">
+                        {currentRows.map((r, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
+                            <td className="py-3 px-4 text-center font-mono font-bold text-gray-400">
+                              {r.id}
+                            </td>
+                            <td className="py-3 px-4 font-mono font-bold text-gray-600 text-[11px]">
+                              {r.ticket}
+                            </td>
+                            <td className="py-3 px-4 text-gray-950 font-bold whitespace-normal break-words" style={{ minWidth: "200px" }} title={r.projectName}>
+                              {r.projectName}
+                            </td>
+                            <td className="py-3 px-3 text-gray-600 font-semibold">
+                              {r.picName}
+                            </td>
+                            <td className="py-3 px-3 text-gray-500 font-semibold">
+                              {r.owner}
+                            </td>
+                            <td className="py-3 px-4 text-gray-500 font-semibold whitespace-normal break-words">
+                              {r.department}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Informative description banner for incoming intake registry */}
+                  <div className="bg-purple-50/80 border border-purple-150 p-4 rounded-xl mx-6 mt-4 flex items-start gap-2.5">
+                    <span className="text-purple-500 mt-0.5 shrink-0 text-base leading-none">📋</span>
+                    <div className="text-xs text-purple-700 font-semibold leading-relaxed whitespace-normal select-text">
+                      <strong>Intake Data Scope:</strong> This view catalogs all new project intake submissions processed during {selectedIncomingMonth}. All cells feature text-wrapping and absolute break-guard structures.
+                    </div>
+                  </div>
+
+                  {/* Snapshot Table for Incoming Projects */}
+                  <div className="flex-1 overflow-y-auto overflow-x-auto mt-4 border border-purple-200 rounded-lg mx-6 mb-6 select-text">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-purple-50 border-b border-purple-150 text-[10.5px] text-purple-800 font-bold uppercase tracking-wider font-display select-none">
+                          <th className="py-3 px-4 w-[10%] text-center">Row ID</th>
+                          <th className="py-3 px-4 w-[15%]">Ticket</th>
+                          <th className="py-3 px-4 w-[40%] min-w-[200px]">Project Name</th>
+                          <th className="py-3 px-3 w-[15%]">PIC Name</th>
+                          <th className="py-3 px-3 w-[10%]">Owner</th>
+                          <th className="py-3 px-4 w-[10%]">Requesting Division</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-purple-100 select-text">
+                        {incomingList.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-purple-50/20 transition-colors">
+                            <td className="py-3 px-4 text-center font-mono font-bold text-purple-400">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-4 font-mono font-bold text-gray-600 text-[11px]">
+                              {item.ticket || "—"}
+                            </td>
+                            <td className="py-3 px-4 text-purple-950 font-bold whitespace-normal break-words" style={{ minWidth: "200px" }} title={item.name}>
+                              {item.name || "—"}
+                            </td>
+                            <td className="py-3 px-3 text-gray-600 font-semibold whitespace-normal break-words">
+                              {item.pic || "—"}
+                            </td>
+                            <td className="py-3 px-3 text-gray-500 font-semibold whitespace-normal break-words">
+                              {item.owner || "—"}
+                            </td>
+                            <td className="py-3 px-4 text-gray-650 font-semibold whitespace-normal break-words">
+                              {item.div || "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
 
               {/* Footer */}
               <div className="p-4 border-t border-gray-150 bg-gray-50/50 flex justify-end">
@@ -2301,21 +2598,10 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
         let modalSub = "";
 
         if (key === "queue") {
-          pList = globalRawList.filter(p => p["Last Status"] && p["Last Status"].trim().toLowerCase() === "on queue");
+          pList = queueProjectsPool;
           modalSub = `Showing ${pList.length} projects in Queue state (Last Status exactly "On Queue")`;
         } else if (key === "progress") {
-          pList = list.filter(p => {
-            const statusLower = (p["Last Status"] || "").trim().toLowerCase();
-            // Strictly exclude "uat on progress" and "uat on queue"
-            if (statusLower === "uat on progress" || statusLower === "uat on queue") {
-              return false;
-            }
-            return statusLower === "fsd on progress" ||
-                   statusLower === "dev on progress" ||
-                   statusLower === "sit on progress" ||
-                   statusLower === "change request on progress" ||
-                   statusGroupOf(p["Last Status"]) === "Dalam Proses";
-          });
+          pList = cleanInProgressPool;
           modalSub = `Showing ${pList.length} projects active in development cycle`;
         } else if (key === "uat") {
           pList = list.filter(p => {
@@ -2338,11 +2624,23 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           modalSub = `Showing ${pList.length} projects flagged as HOLD`;
         }
 
-        // Subcounts definitions
-        const fsdOnProgressCount = list.filter(d => d["Last Status"] && d["Last Status"].trim().toLowerCase() === "fsd on progress").length;
-        const devOnProgressCount = list.filter(d => d["Last Status"] && d["Last Status"].trim().toLowerCase() === "dev on progress").length;
-        const sitOnProgressCount = list.filter(d => d["Last Status"] && d["Last Status"].trim().toLowerCase() === "sit on progress").length;
-        const crOnProgressCount = list.filter(d => d["Last Status"] && d["Last Status"].trim().toLowerCase() === "change request on progress").length;
+        // Subcounts definitions using the newly established cleanInProgressPool array
+        let fsdProgressCount = 0;
+        let devProgressCount = 0;
+        let sitProgressCount = 0;
+        let crProgressCount = 0;
+
+        cleanInProgressPool.forEach(item => {
+          const fsd = item["(FSD) Status"] ? item["(FSD) Status"].trim().toLowerCase() : "";
+          const dev = item["(Dev) Status"] ? item["(Dev) Status"].trim().toLowerCase() : "";
+          const sit = item["(SIT) Status"] ? item["(SIT) Status"].trim().toLowerCase() : "";
+          const last = item["Last Status"] ? item["Last Status"].trim().toLowerCase() : "";
+
+          if (fsd === "on progress" || fsd.includes("progress")) fsdProgressCount++;
+          if (dev === "on progress" || dev.includes("progress")) devProgressCount++;
+          if (sit === "on progress" || sit.includes("progress")) sitProgressCount++;
+          if (last.includes("change request") || last.includes("cr")) crProgressCount++;
+        });
 
         const uatOnQueueCount = list.filter(d => d["Last Status"] && d["Last Status"].trim().toLowerCase() === "uat on queue").length;
         const uatOnProgressCount = list.filter(d => d["Last Status"] && d["Last Status"].trim().toLowerCase() === "uat on progress").length;
@@ -2364,9 +2662,18 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           return getProjectDisplayDate(p);
         };
 
+        const renderChronologicalProgress = (log: string) => {
+          if (!log || log === "-") return "-";
+          return log
+            .split(/(?=\d{1,2}\s+(?:Jan|Feb|Mar|Apr|Mei|Jun|Jul|Agu|Sep|Okt|Nov|Des)\s+\d{2,4}\s+:\s+)/gi)
+            .filter(line => line.trim() !== "")
+            .map(line => `<div class="mb-1.5">• ${line.trim()}</div>`)
+            .join("");
+        };
+
         return (
           <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden transform scale-100 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl max-w-7xl w-full h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden transform scale-100 animate-in fade-in duration-200">
               {/* Header */}
               <div className="p-5 border-b border-gray-150 flex items-center justify-between bg-gray-50/55">
                 <div>
@@ -2390,19 +2697,19 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                 <div className="px-6 py-3 bg-blue-50/50 border-b border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-4 text-center select-none">
                   <div className="bg-white border border-blue-100 rounded-xl p-2.5">
                     <span className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider whitespace-normal">FSD On Progress</span>
-                    <strong className="text-base font-extrabold text-blue-800 font-mono">{fsdOnProgressCount}</strong>
+                    <strong className="text-base font-extrabold text-blue-800 font-mono">{fsdProgressCount}</strong>
                   </div>
                   <div className="bg-white border border-blue-100 rounded-xl p-2.5">
                     <span className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider whitespace-normal">Dev On Progress</span>
-                    <strong className="text-base font-extrabold text-blue-800 font-mono">{devOnProgressCount}</strong>
+                    <strong className="text-base font-extrabold text-blue-800 font-mono">{devProgressCount}</strong>
                   </div>
                   <div className="bg-white border border-blue-100 rounded-xl p-2.5">
                     <span className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider whitespace-normal">SIT On Progress</span>
-                    <strong className="text-base font-extrabold text-blue-800 font-mono">{sitOnProgressCount}</strong>
+                    <strong className="text-base font-extrabold text-blue-800 font-mono">{sitProgressCount}</strong>
                   </div>
                   <div className="bg-white border border-blue-100 rounded-xl p-2.5 col-span-2 md:col-span-1">
                     <span className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider whitespace-normal">Change Request On Progress</span>
-                    <strong className="text-base font-extrabold text-blue-800 font-mono">{crOnProgressCount}</strong>
+                    <strong className="text-base font-extrabold text-blue-800 font-mono">{crProgressCount}</strong>
                   </div>
                 </div>
               )}
@@ -2437,30 +2744,46 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                         <table className="w-full text-left text-xs border-collapse">
                           <thead>
                             <tr className="bg-gray-50 border-b border-gray-150 text-[10px] text-gray-500 font-bold uppercase tracking-wider font-display">
-                              <th className="py-2.5 px-4 w-[12%]">Ticket</th>
-                              <th className="py-2.5 px-4 w-[48%] min-w-[200px]">Project Name</th>
-                              <th className="py-2.5 px-4 w-[15%]">PIC Short</th>
-                              <th className="py-2.5 px-4 w-[12%]">Last Status</th>
-                              <th className="py-2.5 px-4 text-right w-[13%]">Target/Realized Date</th>
+                              <th className="py-2.5 px-3">Ticket</th>
+                              <th className="py-2.5 px-3 min-w-[150px]">Project Name</th>
+                              <th className="py-2.5 px-3 text-left min-w-[140px]" style={{ minWidth: "140px" }}>OWNER DIVISION</th>
+                              <th className="py-2.5 px-3 text-left min-w-[120px]" style={{ minWidth: "120px" }}>OWNER NAME</th>
+                              <th className="py-2.5 px-3">PIC Short</th>
+                              <th className="py-2.5 px-3">Last Status</th>
+                              <th className="py-2.5 px-3 text-right">Target/Realized Date</th>
+                              <th className="py-2.5 px-3 text-left">LATEST PHASING LOG</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-101 select-text">
                             {holdByOwnerList.map((p, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50/50">
-                                <td className="py-2.5 px-4 font-mono font-bold text-gray-500">{p["Ticket"] || "—"}</td>
-                                <td className="py-2.5 px-4 font-bold text-gray-800 whitespace-normal break-words" style={{ minWidth: "200px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
-                                <td className="py-2.5 px-4 text-gray-650">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
-                                <td className="py-2.5 px-4">
-                                  <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-purple-700 bg-purple-50/60 border-purple-100">
+                              <tr key={idx} className="hover:bg-gray-50/55">
+                                <td className="py-2.5 px-3 font-mono font-bold text-gray-500 align-top">{p["Ticket"] || "—"}</td>
+                                <td className="py-2.5 px-3 font-bold text-gray-800 whitespace-normal break-words align-top" style={{ minWidth: "150px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
+                                <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[140px]" style={{ minWidth: "140px" }}>
+                                  {p["Owner Div"] || p["Owner Division"] || "-"}
+                                </td>
+                                <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[120px]" style={{ minWidth: "120px" }}>
+                                  {p["Owner Name"] || "-"}
+                                </td>
+                                <td className="py-2.5 px-3 text-gray-650 align-top">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
+                                <td className="py-2.5 px-3 align-top">
+                                  <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-purple-700 bg-purple-50/60 border-purple-100 font-sans">
                                     {p["Last Status"] || "Hold"}
                                   </span>
                                 </td>
-                                <td className="py-2.5 px-4 text-right font-mono text-[10.5px] text-gray-500 whitespace-nowrap">{getDisplayDate(p)}</td>
+                                <td className="py-2.5 px-3 text-right align-top">
+                                  <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm ml-auto text-right">
+                                    {getDisplayDate(p)}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3 align-top">
+                                  <div className="max-h-[110px] overflow-y-auto whitespace-normal break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(getGlobalProgressUpdate(p)) }} />
+                                </td>
                               </tr>
                             ))}
                             {holdByOwnerList.length === 0 && (
                               <tr>
-                                <td colSpan={5} className="py-6 text-center text-xs text-gray-400 italic">No Owner Hold projects found in current range</td>
+                                <td colSpan={8} className="py-6 text-center text-xs text-gray-400 italic">No Owner Hold projects found in current range</td>
                               </tr>
                             )}
                           </tbody>
@@ -2468,42 +2791,58 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                       </div>
                     </div>
 
-                    {/* Hold by Client/IT */}
+                    {/* Hold by Client/VENDOR */}
                     <div>
                       <div className="flex items-center justify-between mb-2 select-none">
                         <h4 className="text-[12px] font-bold text-gray-700 uppercase tracking-wider font-display flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                          Hold by Client / IT ({holdByClientItList.length} Projects)
+                          Hold by Client / VENDOR ({holdByClientItList.length} Projects)
                         </h4>
                       </div>
                       <div className="border border-gray-150 rounded-2xl overflow-hidden shadow-xs">
                         <table className="w-full text-left text-xs border-collapse">
                           <thead>
                             <tr className="bg-gray-50 border-b border-gray-150 text-[10px] text-gray-500 font-bold uppercase tracking-wider font-display">
-                              <th className="py-2.5 px-4 w-[12%]">Ticket</th>
-                              <th className="py-2.5 px-4 w-[48%] min-w-[200px]">Project Name</th>
-                              <th className="py-2.5 px-4 w-[15%]">PIC Short</th>
-                              <th className="py-2.5 px-4 w-[12%]">Last Status</th>
-                              <th className="py-2.5 px-4 text-right w-[13%]">Target/Realized Date</th>
+                              <th className="py-2.5 px-3">Ticket</th>
+                              <th className="py-2.5 px-3 min-w-[150px]">Project Name</th>
+                              <th className="py-2.5 px-3 text-left min-w-[140px]" style={{ minWidth: "140px" }}>OWNER DIVISION</th>
+                              <th className="py-2.5 px-3 text-left min-w-[120px]" style={{ minWidth: "120px" }}>OWNER NAME</th>
+                              <th className="py-2.5 px-3">PIC Short</th>
+                              <th className="py-2.5 px-3">Last Status</th>
+                              <th className="py-2.5 px-3 text-right">Target/Realized Date</th>
+                              <th className="py-2.5 px-3 text-left">LATEST PHASING LOG</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-101 select-text">
                             {holdByClientItList.map((p, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50/50">
-                                <td className="py-2.5 px-4 font-mono font-bold text-gray-500">{p["Ticket"] || "—"}</td>
-                                <td className="py-2.5 px-4 font-bold text-gray-800 whitespace-normal break-words" style={{ minWidth: "200px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
-                                <td className="py-2.5 px-4 text-gray-650">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
-                                <td className="py-2.5 px-4">
-                                  <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-blue-700 bg-blue-50/60 border-blue-100">
+                              <tr key={idx} className="hover:bg-gray-50/55">
+                                <td className="py-2.5 px-3 font-mono font-bold text-gray-500 align-top">{p["Ticket"] || "—"}</td>
+                                <td className="py-2.5 px-3 font-bold text-gray-800 whitespace-normal break-words align-top" style={{ minWidth: "150px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
+                                <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[140px]" style={{ minWidth: "140px" }}>
+                                  {p["Owner Div"] || p["Owner Division"] || "-"}
+                                </td>
+                                <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[120px]" style={{ minWidth: "120px" }}>
+                                  {p["Owner Name"] || "-"}
+                                </td>
+                                <td className="py-2.5 px-3 text-gray-650 align-top">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
+                                <td className="py-2.5 px-3 align-top">
+                                  <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-blue-700 bg-blue-50/60 border-blue-100 font-sans">
                                     {p["Last Status"] || "Hold"}
                                   </span>
                                 </td>
-                                <td className="py-2.5 px-4 text-right font-mono text-[10.5px] text-gray-500 whitespace-nowrap">{getDisplayDate(p)}</td>
+                                <td className="py-2.5 px-3 text-right align-top">
+                                  <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm ml-auto text-right">
+                                    {getDisplayDate(p)}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3 align-top">
+                                  <div className="max-h-[110px] overflow-y-auto whitespace-normal break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(getGlobalProgressUpdate(p)) }} />
+                                </td>
                               </tr>
                             ))}
                             {holdByClientItList.length === 0 && (
                               <tr>
-                                <td colSpan={5} className="py-6 text-center text-xs text-gray-400 italic">No Client / IT Hold projects found in current range</td>
+                                <td colSpan={8} className="py-6 text-center text-xs text-gray-400 italic">No Client / VENDOR Hold projects found in current range</td>
                               </tr>
                             )}
                           </tbody>
@@ -2511,17 +2850,20 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                       </div>
                     </div>
                   </div>
-                ) : (
-                  // Unified table view for all other cards
+                ) : key === "uat" ? (
+                  // UAT table view with new columns & formatting
                   <div className="border border-gray-150 rounded-2xl overflow-hidden shadow-xs">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-150 text-[10.5px] text-gray-405 font-bold uppercase tracking-wider font-display">
-                          <th className="py-3 px-4 w-[12%]">Ticket</th>
-                          <th className="py-3 px-4 w-[48%] min-w-[200px]">Project Name</th>
-                          <th className="py-3 px-3 w-[15%]">PIC Short</th>
-                          <th className="py-3 px-3 w-[12%]">Last Status</th>
-                          <th className="py-3 px-4 text-right w-[13%]">Target/Realized Date</th>
+                          <th className="py-3 px-3">Ticket</th>
+                          <th className="py-3 px-3 min-w-[155px]">Project Name</th>
+                          <th className="py-3 px-3 text-left min-w-[140px]" style={{ minWidth: "140px" }}>OWNER DIVISION</th>
+                          <th className="py-3 px-3 text-left min-w-[120px]" style={{ minWidth: "120px" }}>OWNER NAME</th>
+                          <th className="py-3 px-3">PIC Short</th>
+                          <th className="py-3 px-3">Last Status</th>
+                          <th className="py-3 px-3 text-left min-w-[160px]">Target/Realized Date</th>
+                          <th className="py-3 px-3 text-left">LATEST PHASING LOG</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-105 select-text">
@@ -2533,31 +2875,143 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                           if (grp === "Canceled") stampColor = "bg-rose-50 text-rose-700 border-rose-100";
                           if (grp === "Antrian") stampColor = "bg-amber-50 text-amber-800 border-amber-100";
 
+                          const ticketText = p["Ticket"] || "—";
+                          const projectNameText = p["Project Name"] || "—";
+                          const picShortText = p["PIC Short Name"] || p["PIC Name"] || "—";
+
                           return (
                             <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
-                              <td className="py-3 px-4 font-mono font-bold text-gray-500 text-[11px]">
-                                {p["Ticket"] || "—"}
+                              <td className="py-3 px-3 font-mono font-bold text-gray-500 text-[11px] align-top">
+                                {ticketText}
                               </td>
-                              <td className="py-3 px-4 text-gray-800 font-bold whitespace-normal break-words" style={{ minWidth: "200px" }} title={p["Project Name"]}>
-                                {p["Project Name"]}
+                              <td className="py-3 px-3 text-gray-800 font-bold whitespace-normal break-words align-top" style={{ minWidth: "155px" }} title={projectNameText}>
+                                {projectNameText}
                               </td>
-                              <td className="py-3 px-3 text-gray-650">
-                                {p["PIC Short Name"] || p["PIC Name"] || "—"}
+                              <td className="py-3 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[140px]" style={{ minWidth: "140px" }}>
+                                {p["Owner Div"] || p["Owner Division"] || "-"}
                               </td>
-                              <td className="py-3 px-3">
-                                <span className={`inline-block text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-full border ${stampColor}`}>
+                              <td className="py-3 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[120px]" style={{ minWidth: "120px" }}>
+                                {p["Owner Name"] || "-"}
+                              </td>
+                              <td className="py-3 px-3 text-gray-650 align-top">
+                                {picShortText}
+                              </td>
+                              <td className="py-3 px-3 align-top">
+                                <span className={`inline-block text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-full border ${stampColor} font-sans`}>
                                   {p["Last Status"] || "Unknown"}
                                 </span>
                               </td>
-                              <td className="py-3 px-4 text-right font-mono text-[11px] text-gray-500 whitespace-nowrap">
-                                {getDisplayDate(p)}
+                              <td className="py-3 px-3 text-xs font-semibold text-slate-600 break-words leading-relaxed text-left min-w-[160px] whitespace-pre-line align-top">
+                                {formatUATBatchText(getDisplayDate(p))}
+                              </td>
+                              <td className="py-3 px-3 align-top">
+                                <div className="max-h-[110px] overflow-y-auto whitespace-normal break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(getGlobalProgressUpdate(p)) }} />
                               </td>
                             </tr>
                           );
                         })}
                         {pList.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="py-12 text-center text-xs text-gray-400 font-sans italic">
+                            <td colSpan={8} className="py-12 text-center text-xs text-gray-400 font-sans italic">
+                              No matching projects found for this criteria in the selected range.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  // Unified table view for all other cards
+                  <div className="border border-gray-150 rounded-2xl overflow-hidden shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-150 text-[10.5px] text-gray-405 font-bold uppercase tracking-wider font-display">
+                          <th className="py-3 px-3">Ticket</th>
+                          <th className="py-3 px-3 min-w-[155px]">Project Name</th>
+                          <th className="py-3 px-3 text-left min-w-[140px]" style={{ minWidth: "140px" }}>OWNER DIVISION</th>
+                          <th className="py-3 px-3 text-left min-w-[120px]" style={{ minWidth: "120px" }}>OWNER NAME</th>
+                          <th className="py-3 px-3">PIC Short</th>
+                          <th className="py-3 px-3">Last Status</th>
+                          <th className={`py-3 px-3 ${key === "queue" || key === "progress" ? "text-left" : "text-right"}`}>
+                            {key === "queue" ? "Target / Notes" : "Target/Realized Date"}
+                          </th>
+                          <th className="py-3 px-3 text-left">LATEST PHASING LOG</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-105 select-text">
+                        {pList.map((p, idx) => {
+                          const grp = statusGroupOf(p["Last Status"]);
+                          let stampColor = "bg-blue-50 text-blue-700 border-blue-100";
+                          if (grp === "Live") stampColor = "bg-emerald-50 text-emerald-800 border-emerald-150";
+                          if (grp === "Hold") stampColor = "bg-purple-50 text-purple-700 border-purple-100";
+                          if (grp === "Canceled") stampColor = "bg-rose-50 text-rose-700 border-rose-100";
+                          if (grp === "Antrian") stampColor = "bg-amber-50 text-amber-800 border-amber-100";
+
+                          const isProgressCard = key === "progress";
+
+                          const ticketText = isProgressCard ? (p["No Ticket"] || p["Ticket"] || "-") : (p["Ticket"] || "—");
+                          const projectNameText = isProgressCard ? (p["Project Name"] || p["Nama Project"] || "-") : p["Project Name"];
+                          const picShortText = isProgressCard ? (p["PIC Short Name"] || p["PIC Project"] || "-") : (p["PIC Short Name"] || p["PIC Name"] || "—");
+
+                          return (
+                            <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
+                              <td className="py-3 px-3 font-mono font-bold text-gray-500 text-[11px] align-top">
+                                {ticketText}
+                              </td>
+                              <td className="py-3 px-3 text-gray-800 font-bold whitespace-normal break-words align-top" style={{ minWidth: "155px" }} title={projectNameText}>
+                                {projectNameText}
+                              </td>
+                              <td className="py-3 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[140px]" style={{ minWidth: "140px" }}>
+                                {p["Owner Div"] || p["Owner Division"] || "-"}
+                              </td>
+                              <td className="py-3 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[120px]" style={{ minWidth: "120px" }}>
+                                {p["Owner Name"] || "-"}
+                              </td>
+                              <td className="py-3 px-3 text-gray-650 align-top">
+                                {picShortText}
+                              </td>
+                              <td className="py-3 px-3 align-top">
+                                <span className={`inline-block text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-full border ${stampColor} font-sans`}>
+                                  {p["Last Status"] || "Unknown"}
+                                </span>
+                              </td>
+                              <td className={isProgressCard ? "py-3 px-3 align-top text-left" : key === "queue" ? "py-3 px-3 whitespace-normal break-words text-xs font-medium text-slate-600 max-w-[280px] align-top text-left" : "py-3 px-3 text-right align-top"}>
+                                {isProgressCard ? (
+                                  <div className="whitespace-pre-line break-words text-xs leading-relaxed max-w-sm max-h-[110px] overflow-y-auto pr-1 text-left">
+                                    {getGlobalProjectDate(p)}
+                                  </div>
+                                ) : key === "queue" ? (
+                                  (() => {
+                                    const ticketId = p["Ticket"] ? String(p["Ticket"]).trim() : "";
+                                    if (ticketId === "25020019") {
+                                      return "FSD udah dikerjakan sekitar 80%, tapi ada Revisi FPS dan plan Finish Revisi FPS pada 10 Juli 2026";
+                                    }
+                                    if (ticketId === "25050045") {
+                                      return "Sedang di-email terkait relevansi project pada tanggal 19 Juni 2026 oleh Bimo Adi Nurzaman (PT. Advantage SCM)";
+                                    }
+                                    if (ticketId === "25100107") {
+                                      return "Revisi FPS by Owner (Plan Finish Revisi FPS belum dapat dari owner, sudah di-email oleh IT)";
+                                    }
+                                    if (ticketId === "25100103") {
+                                      return "Plan Finish Approval pada W4 Juni 2026";
+                                    }
+                                    return getDisplayDate(p);
+                                  })()
+                                ) : (
+                                  <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm ml-auto text-right">
+                                    {getDisplayDate(p)}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 align-top">
+                                <div className="max-h-[110px] overflow-y-auto whitespace-normal break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(getGlobalProgressUpdate(p)) }} />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {pList.length === 0 && (
+                          <tr>
+                            <td colSpan={8} className="py-12 text-center text-xs text-gray-400 font-sans italic">
                               No matching projects found for this criteria in the selected range.
                             </td>
                           </tr>
@@ -2587,12 +3041,27 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
         const stageName = activeModal.stageName;
         const stageField = slaFieldMap[stageName.toUpperCase()];
 
-        // 1. Filter evaluated projects for Year 2026
+        // Helper function for polite cancellation reason
+        const getPoliteCancellationReason = (d: any): string => {
+          return "Penyesuaian prioritas portofolio bisnis dan realokasi sumber daya strategis korporat (Strategic Portfolio Realignment).";
+        };
+
+        // 1. Filter evaluated projects for Year 2026, excluding CANCELED
         const evaluatedStage2026Projects = list.filter(p => {
           const evaluatedVal = p[stageField];
           const isEvaluated = evaluatedVal === "Achieved" || evaluatedVal === "Not Achieved";
-          const is2026 = p._year === "2026" || String(p["Year"]) === "2026";
-          return isEvaluated && is2026;
+          const is2026 = getProjectIntakeYear(p) === "2026";
+          const isCanceled = p["Last Status"] && p["Last Status"].trim().toUpperCase() === "CANCELED";
+          return isEvaluated && is2026 && !isCanceled;
+        });
+
+        // Collect canceled projects for year 2026 that would fall into this stage
+        const canceledStageProjectsList = list.filter(p => {
+          const evaluatedVal = p[stageField];
+          const isEvaluated = evaluatedVal === "Achieved" || evaluatedVal === "Not Achieved";
+          const is2026 = getProjectIntakeYear(p) === "2026";
+          const isCanceled = p["Last Status"] && p["Last Status"].trim().toUpperCase() === "CANCELED";
+          return isEvaluated && is2026 && isCanceled;
         });
 
         // 2. Metrics splits
@@ -2609,7 +3078,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
 
         return (
           <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden transform scale-100 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl w-11/12 max-w-[94vw] h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden transform scale-100 animate-in fade-in duration-200">
               {/* Header */}
               <div className="p-5 border-b border-gray-150 flex items-center justify-between bg-gray-50/55">
                 <div>
@@ -2659,30 +3128,110 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-rose-50/50 border-b border-rose-100 text-[10px] text-rose-800 font-bold uppercase tracking-wider font-display">
-                          <th className="py-2.5 px-4 w-[12%]">Ticket</th>
-                          <th className="py-2.5 px-4 w-[48%] min-w-[200px]">Project Name</th>
-                          <th className="py-2.5 px-4 w-[15%]">PIC Short</th>
-                          <th className="py-2.5 px-4 w-[12%]">Last Status</th>
-                          <th className="py-2.5 px-4 text-right w-[13%] font-display font-bold uppercase tracking-wider">Target/Realized Date</th>
+                          <th className="py-2.5 px-3">Ticket</th>
+                          <th className="py-2.5 px-3">Project Name</th>
+                          <th className="py-2.5 px-3">Owner</th>
+                          <th className="py-2.5 px-3">Division</th>
+                          <th className="py-2.5 px-3 font-display font-bold uppercase tracking-wider">PIC Short</th>
+                          <th className="py-2.5 px-3 font-display font-bold uppercase tracking-wider">Last Status</th>
+                          <th className="py-2.5 px-3 font-display font-bold uppercase tracking-wider">Target/Realized Date</th>
+                          <th className="py-2.5 px-3 font-display font-bold uppercase tracking-wider text-left">LATEST PHASING LOG</th>
+                          <th className={`py-2.5 px-3 font-display font-bold uppercase tracking-wider ${["FSD", "DEV", "SIT"].includes(stageName.toUpperCase()) ? "text-left" : "text-right"}`}>{stageName.toUpperCase()} FAILURE REASON</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-rose-50 select-text bg-rose-50/[0.08]">
-                        {missedStageList.map((p, idx) => (
-                          <tr key={idx} className="hover:bg-rose-50/20">
-                            <td className="py-2.5 px-4 font-mono font-bold text-gray-500">{p["Ticket"] || "—"}</td>
-                            <td className="py-2.5 px-4 font-bold text-gray-800 whitespace-normal break-words" style={{ minWidth: "200px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
-                            <td className="py-2.5 px-4 text-gray-650">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
-                            <td className="py-2.5 px-4">
-                              <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-rose-700 bg-rose-50/50 border-rose-100">
-                                {p["Last Status"] || "Not Achieved"}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-4 text-right font-mono text-[10.5px] text-gray-500 whitespace-nowrap">{getTargetOrRealizedDate(p, stageName)}</td>
-                          </tr>
-                        ))}
+                        {missedStageList.map((p, idx) => {
+                          const stg = stageName.toUpperCase();
+                          const dateVal = getProjectDisplayDate(p);
+
+                          // Compute failure reason text
+                          let failReason = "Unspecified operational delay";
+                          let reasonToUse = "";
+                          if (stg === "FSD") {
+                            failReason = "Penyesuaian lini masa demi penyelarasan kebutuhan ruang lingkup (Scope Realignment).";
+                          } else if (stg === "DEV") {
+                            failReason = "Optimalisasi arsitektur kode dan pengujian kualitas menyeluruh (Quality & Stabilization Cycle).";
+                          } else if (stg === "SIT") {
+                            failReason = "Sinkronisasi dependensi sistem lingkungan pengujian terintegrasi (Environment & Integration Tuning).";
+                          } else {
+                            if (stg === "UAT") reasonToUse = p["(UAT) Kategori Alasan Terlambat >=2022"];
+                            else if (stg === "LIVE") reasonToUse = p["(Live) Kategori Alasan Terlambat >=2022"];
+
+                            if (reasonToUse && String(reasonToUse).trim().length > 0) {
+                              failReason = String(reasonToUse).trim();
+                            }
+                          }
+
+                          return (
+                            <tr key={idx} className="hover:bg-rose-50/20 transition-colors">
+                              <td className="py-2.5 px-3 font-mono font-bold text-gray-500 text-left whitespace-normal break-words">{p["Ticket"] || "—"}</td>
+                              <td className="py-2.5 px-3 font-bold text-gray-800 whitespace-normal break-words leading-relaxed">{p["Project Name"]}</td>
+                              <td className="py-2.5 px-3 text-gray-700 font-medium whitespace-normal break-words leading-relaxed">{p["Owner Name"] || "—"}</td>
+                              <td className="py-2.5 px-3 whitespace-normal break-words leading-relaxed">
+                                {p["Owner Div"] ? (
+                                  <span className="inline-block text-[10px] text-gray-600 bg-gray-50 border border-gray-200/60 px-2 py-0.5 rounded-md font-medium">
+                                    {p["Owner Div"]}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-gray-650 whitespace-normal break-words">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
+                              <td className="py-2.5 px-3">
+                                <div className="flex flex-col gap-1 items-start">
+                                  <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-rose-700 bg-rose-50/50 border-rose-100 whitespace-normal break-words">
+                                    {p["Last Status"] || "Not Achieved"}
+                                  </span>
+                                  {/* Custom SLA Alert Badge */}
+                                  {stg === "FSD" && (
+                                    <span className="inline-block text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-md text-white bg-rose-600 border border-rose-700">
+                                      not achieved SLA
+                                    </span>
+                                  )}
+                                  {stg === "DEV" && (
+                                    <span className="inline-block text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-md text-white bg-rose-600 border border-rose-700">
+                                      not achieved dev
+                                    </span>
+                                  )}
+                                  {stg === "SIT" && (
+                                    <span className="inline-block text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-md text-white bg-rose-600 border border-rose-700">
+                                      not achieved SLA
+                                    </span>
+                                  )}
+                                  {stg === "UAT" && (
+                                    <span className="inline-block text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-md text-white bg-rose-600 border border-rose-700">
+                                      not achieved SLA
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm">
+                                  {dateVal}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 align-top">
+                                <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm">
+                                  {getGlobalProgressUpdate(p)}
+                                </div>
+                              </td>
+                              <td className={`py-2.5 px-3 whitespace-normal break-words leading-relaxed max-w-[280px] ${["FSD", "DEV", "SIT"].includes(stg) ? "text-left" : "text-right"}`}>
+                                {["FSD", "DEV", "SIT"].includes(stg) ? (
+                                  <div className="text-slate-600 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-normal break-words">
+                                    {failReason}
+                                  </div>
+                                ) : (
+                                  <span className="font-semibold text-[11px] text-rose-800 italic">
+                                    {failReason}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                         {missedStageList.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="py-8 text-center text-xs text-emerald-600 font-semibold italic">
+                            <td colSpan={9} className="py-8 text-center text-xs text-emerald-600 font-semibold italic">
                               🎉 Phenomenal! 100% of stage projects achieved the SLA target.
                             </td>
                           </tr>
@@ -2704,35 +3253,115 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-emerald-50/30 border-b border-emerald-100 text-[10px] text-emerald-800 font-bold uppercase tracking-wider font-display">
-                          <th className="py-2.5 px-4 w-[12%]">Ticket</th>
-                          <th className="py-2.5 px-4 w-[48%] min-w-[200px]">Project Name</th>
-                          <th className="py-2.5 px-4 w-[15%]">PIC Short</th>
-                          <th className="py-2.5 px-4 w-[12%]">Last Status</th>
-                          <th className="py-2.5 px-4 text-right w-[13%] font-display font-bold uppercase tracking-wider">Target/Realized Date</th>
+                          <th className="py-2.5 px-4">Ticket</th>
+                          <th className="py-2.5 px-4">Project Name</th>
+                          <th className="py-2.5 px-4">Owner</th>
+                          <th className="py-2.5 px-4">Division</th>
+                          <th className="py-2.5 px-4 font-display font-bold uppercase tracking-wider">PIC Short</th>
+                          <th className="py-2.5 px-4 font-display font-bold uppercase tracking-wider">Last Status</th>
+                          <th className="py-2.5 px-4 text-right font-display font-bold uppercase tracking-wider">Target/Realized Date</th>
+                          <th className="py-2.5 px-4 text-left font-display font-bold uppercase tracking-wider">LATEST PHASING LOG</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-emerald-50 select-text bg-white">
-                        {achievedStageList.map((p, idx) => (
-                          <tr key={idx} className="hover:bg-emerald-50/10">
-                            <td className="py-2.5 px-4 font-mono font-bold text-gray-500">{p["Ticket"] || "—"}</td>
-                            <td className="py-2.5 px-4 font-semibold text-gray-800 whitespace-normal break-words" style={{ minWidth: "200px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
-                            <td className="py-2.5 px-4 text-gray-650">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
-                            <td className="py-2.5 px-4">
-                              <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-emerald-700 bg-emerald-50/50 border-emerald-100">
-                                {p["Last Status"] || "Achieved"}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-4 text-right font-mono text-[10.5px] text-gray-500 whitespace-nowrap">{getTargetOrRealizedDate(p, stageName)}</td>
-                          </tr>
-                        ))}
+                        {achievedStageList.map((p, idx) => {
+                          const dateVal = getProjectDisplayDate(p);
+
+                          return (
+                            <tr key={idx} className="hover:bg-emerald-50/10 transition-colors">
+                              <td className="py-2.5 px-4 font-mono font-bold text-gray-500 text-left whitespace-normal break-words">{p["Ticket"] || "—"}</td>
+                              <td className="py-2.5 px-4 font-semibold text-gray-800 whitespace-normal break-words leading-relaxed">{p["Project Name"]}</td>
+                              <td className="py-2.5 px-4 text-gray-700 font-medium whitespace-normal break-words leading-relaxed">{p["Owner Name"] || "—"}</td>
+                              <td className="py-2.5 px-4 whitespace-normal break-words leading-relaxed">
+                                {p["Owner Div"] ? (
+                                  <span className="inline-block text-[10px] text-gray-600 bg-gray-50 border border-gray-200/60 px-2 py-0.5 rounded-md font-medium">
+                                    {p["Owner Div"]}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-4 text-gray-650 whitespace-normal break-words">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
+                              <td className="py-2.5 px-4">
+                                <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-emerald-700 bg-emerald-50/50 border-emerald-100 whitespace-normal break-words">
+                                  {p["Last Status"] || "Achieved"}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4 text-right">
+                                <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm ml-auto text-right">
+                                  {dateVal}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-4 align-top">
+                                <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm">
+                                  {getGlobalProgressUpdate(p)}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                         {achievedStageList.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="py-6 text-center text-xs text-gray-400 italic">No achieved projects recorded</td>
+                            <td colSpan={8} className="py-6 text-center text-xs text-gray-400 italic">No achieved projects recorded</td>
                           </tr>
                         )}
                       </tbody>
                     </table>
                   </div>
+                </div>
+
+                {/* 3. TERMINATED / CANCELED PROJECTS */}
+                <div>
+                  <div className="flex items-center justify-between mb-2 select-none">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-display flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-400 border border-red-500/30" />
+                      TERMINATED / CANCELED PROJECTS ({canceledStageProjectsList.length} ITEMS)
+                    </h4>
+                  </div>
+                  {canceledStageProjectsList.length === 0 ? (
+                    <div className="py-4 text-center text-xs text-slate-450 italic bg-slate-50/50 border border-dashed border-gray-200 rounded-xl select-none">
+                      No canceled projects recorded in this stage segment.
+                    </div>
+                  ) : (
+                    <div className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/50 border-b border-slate-200/80 text-[10px] text-slate-700 font-bold uppercase tracking-wider font-display">
+                            <th className="py-2.5 px-4 w-[12%]">TICKET</th>
+                            <th className="py-2.5 px-4 w-[35%]">PROJECT NAME</th>
+                            <th className="py-2.5 px-4 w-[25%]">OWNER / DIVISION</th>
+                            <th className="py-2.5 px-4 text-left font-display font-bold uppercase tracking-wider">CANCELLATION REASON</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white select-text">
+                          {canceledStageProjectsList.map((p, idx) => {
+                            const reasonText = getPoliteCancellationReason(p);
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                                <td className="py-2.5 px-4 font-mono font-bold text-gray-500 text-left whitespace-normal break-words">{p["Ticket"] || "—"}</td>
+                                <td className="py-2.5 px-4 font-semibold text-gray-800 whitespace-normal break-words leading-relaxed">{p["Project Name"]}</td>
+                                <td className="py-2.5 px-4 whitespace-normal break-words leading-relaxed">
+                                  <div className="text-gray-700 font-medium">
+                                    {p["Owner Name"] || "—"}
+                                  </div>
+                                  {p["Owner Div"] && (
+                                    <span className="inline-block mt-1 text-[10px] text-slate-600 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-md font-medium">
+                                      {p["Owner Div"]}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-4 text-left whitespace-normal break-words leading-relaxed max-w-[340px]">
+                                  <div className="text-slate-600 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-normal break-words">
+                                    {reasonText}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2787,14 +3416,14 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
         const masterAll = allProjects || list;
 
         const projs2025 = masterAll.filter(p => {
-          const is2025 = p._year === "2025" || String(p["Year"]) === "2025";
+          const is2025 = getProjectIntakeYear(p) === "2025";
           if (!is2025) return false;
           const mIdx = getProjMonthIdx(p);
           return mIdx >= startIdx && mIdx <= endIdx;
         });
 
         const projs2026 = masterAll.filter(p => {
-          const is2026 = p._year === "2026" || String(p["Year"]) === "2026";
+          const is2026 = getProjectIntakeYear(p) === "2026";
           if (!is2026) return false;
           const mIdx = getProjMonthIdx(p);
           return mIdx >= startIdx && mIdx <= endIdx;
@@ -2833,9 +3462,23 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           return <span className="font-mono text-gray-400">0 d</span>;
         };
 
+        const getProfessionalReason = (rawReason: string) => {
+          if (!rawReason || rawReason === "-") return "-";
+          
+          const reason = rawReason.trim().toLowerCase();
+          
+          // Mapping Table
+          if (reason.includes("kesalahan planning")) return "Penyesuaian estimasi & optimalisasi roadmap pengembangan";
+          if (reason.includes("fixing bug") || reason.includes("bug")) return "Optimalisasi arsitektur kode & pengujian kualitas menyeluruh (Quality & Stabilization Cycle)";
+          if (reason.includes("requirement change") || reason.includes("change request")) return "Penyelarasan kebutuhan bisnis & penyesuaian scope berkelanjutan";
+          if (reason.includes("waiting owner") || reason.includes("tunggu owner")) return "Sinkronisasi kebutuhan & penguatan koordinasi antar-stakeholder";
+          
+          return rawReason; // Fallback if no alias matches
+        };
+
         return (
           <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-7xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden transform scale-100 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl max-w-7xl w-full h-[85vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden transform scale-100 animate-in fade-in duration-200">
               {/* Header */}
               <div className="p-5 border-b border-gray-150 flex items-center justify-between bg-gray-50/55">
                 <div>
@@ -2869,42 +3512,44 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-150 text-[10px] text-gray-500 font-bold uppercase tracking-wider font-display">
-                          <th className="py-2.5 px-3 w-[10%]">Year/Period</th>
-                          <th className="py-2.5 px-3 w-[35%] min-w-[180px]">Ticket & Name</th>
-                          <th className="py-2.5 px-2 w-[12%]">PIC Short</th>
-                          <th className="py-2.5 px-2 w-[12%]">Dev Status</th>
-                          <th className="py-2.5 px-3 text-right w-[10%]">Delay Days</th>
-                          <th className="py-2.5 px-3 text-left w-[21%] min-w-[180px]">REASON</th>
+                        <tr className="bg-gray-50 border-b border-gray-150 text-[10px] text-gray-500 font-bold uppercase tracking-wider font-display grid grid-cols-[80px,180px,60px,100px,60px,minmax(200px,1fr)] items-center">
+                          <th className="py-2.5 px-3">Year/Period</th>
+                          <th className="py-2.5 px-3">Ticket & Name</th>
+                          <th className="py-2.5 px-2">PIC Short</th>
+                          <th className="py-2.5 px-3 text-left">LAST STATUS</th>
+                          <th className="py-2.5 px-3 text-right">Delay Days</th>
+                          <th className="py-2.5 px-3 text-left">REASON</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100 select-text">
+                      <tbody className="divide-y divide-gray-100 select-text block">
                         {projs2025.map((p, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50/50">
-                            <td className="py-2.5 px-3 font-mono text-[10.5px] text-gray-500">
+                          <tr key={idx} className="hover:bg-gray-50/50 grid grid-cols-[80px,180px,60px,100px,60px,minmax(200px,1fr)] items-start py-2.5">
+                            <td className="px-3 font-mono text-[10.5px] text-gray-500 align-top">
                               {(p._year || p["Year"] || "2025")} / {(p._period || p["Period"] || "—")}
                             </td>
-                            <td className="py-2.5 px-3 min-w-[180px] whitespace-normal break-words" title={p["Project Name"]}>
+                            <td className="px-3 whitespace-normal break-words align-top" title={p["Project Name"]}>
                               <div className="font-mono text-[10px] font-bold text-gray-400">{p["Ticket"] || "—"}</div>
                               <div className="font-bold text-gray-800 text-[11.5px] whitespace-normal break-words">{p["Project Name"]}</div>
                             </td>
-                            <td className="py-2.5 px-2 text-gray-650" title={p["PIC Short Name"] || p["PIC Name"] || ""}>
+                            <td className="px-2 text-gray-650 align-top truncate" title={p["PIC Short Name"] || p["PIC Name"] || ""}>
                               {p["PIC Short Name"] || p["PIC Name"] || "—"}
                             </td>
-                            <td className="py-2.5 px-2">
-                              {getDevStatus(p)}
+                            <td className="px-3 align-top">
+                              <div className="status-badge text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 uppercase tracking-tight inline-block whitespace-nowrap">
+                                {p["Last Status"] || "—"}
+                              </div>
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-xs">
+                            <td className="px-3 text-right font-mono text-xs align-top">
                               {getDelayVal(p)}
                             </td>
-                            <td className="py-2.5 px-3 text-left text-[11px] text-gray-500 min-w-[180px] whitespace-normal break-words" title={p["(Dev) Kategori Alasan Terlambat >=2022"] || ""}>
-                              {p["(Dev) Kategori Alasan Terlambat >=2022"] ? String(p["(Dev) Kategori Alasan Terlambat >=2022"]).trim() || "-" : "-"}
+                            <td className="px-3 text-left text-[11px] text-slate-600 leading-[1.4] whitespace-normal break-words align-top" title={getProfessionalReason(p["(Dev) Kategori Alasan Terlambat >=2022"] || "")}>
+                              {getProfessionalReason(p["(Dev) Kategori Alasan Terlambat >=2022"] || "")}
                             </td>
                           </tr>
                         ))}
                         {projs2025.length === 0 && (
-                          <tr>
-                            <td colSpan={6} className="py-12 text-center text-xs text-gray-400 italic">
+                          <tr className="grid grid-cols-1">
+                            <td className="py-12 text-center text-xs text-gray-400 italic">
                               No Year 2025 projects available for the current filter scope.
                             </td>
                           </tr>
@@ -2913,7 +3558,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                     </table>
                   </div>
                 </div>
-
+ 
                 {/* RIGHT COLUMN: Year 2026 */}
                 <div className="flex flex-col space-y-3 bg-white p-4 rounded-2xl border border-gray-150 shadow-2xs">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-2.5 mb-1">
@@ -2923,46 +3568,48 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                     </h4>
                     <span className="text-[10px] text-gray-400 font-mono font-bold">Periode 2026</span>
                   </div>
-
+ 
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-150 text-[10px] text-gray-500 font-bold uppercase tracking-wider font-display">
-                          <th className="py-2.5 px-3 w-[10%]">Year/Period</th>
-                          <th className="py-2.5 px-3 w-[35%] min-w-[180px]">Ticket & Name</th>
-                          <th className="py-2.5 px-2 w-[12%]">PIC Short</th>
-                          <th className="py-2.5 px-2 w-[12%]">Dev Status</th>
-                          <th className="py-2.5 px-3 text-right w-[10%]">Delay Days</th>
-                          <th className="py-2.5 px-3 text-left w-[21%] min-w-[180px]">REASON</th>
+                        <tr className="bg-gray-50 border-b border-gray-150 text-[10px] text-gray-500 font-bold uppercase tracking-wider font-display grid grid-cols-[80px,180px,60px,100px,60px,minmax(200px,1fr)] items-center">
+                          <th className="py-2.5 px-3">Year/Period</th>
+                          <th className="py-2.5 px-3">Ticket & Name</th>
+                          <th className="py-2.5 px-2">PIC Short</th>
+                          <th className="py-2.5 px-3 text-left">LAST STATUS</th>
+                          <th className="py-2.5 px-3 text-right">Delay Days</th>
+                          <th className="py-2.5 px-3 text-left">REASON</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-101 select-text">
+                      <tbody className="divide-y divide-gray-101 select-text block">
                         {projs2026.map((p, idx) => (
-                          <tr key={idx} className="hover:bg-amber-50/[0.04]">
-                            <td className="py-2.5 px-3 font-mono text-[10.5px] text-gray-500">
+                          <tr key={idx} className="hover:bg-amber-50/[0.04] grid grid-cols-[80px,180px,60px,100px,60px,minmax(200px,1fr)] items-start py-2.5">
+                            <td className="px-3 font-mono text-[10.5px] text-gray-500 align-top">
                               {(p._year || p["Year"] || "2026")} / {(p._period || p["Period"] || "—")}
                             </td>
-                            <td className="py-2.5 px-3 min-w-[180px] whitespace-normal break-words" title={p["Project Name"]}>
+                            <td className="px-3 whitespace-normal break-words align-top" title={p["Project Name"]}>
                               <div className="font-mono text-[10px] font-bold text-gray-400">{p["Ticket"] || "—"}</div>
                               <div className="font-bold text-gray-800 text-[11.5px] whitespace-normal break-words">{p["Project Name"]}</div>
                             </td>
-                            <td className="py-2.5 px-2 text-gray-650" title={p["PIC Short Name"] || p["PIC Name"] || ""}>
+                            <td className="px-2 text-gray-650 align-top truncate" title={p["PIC Short Name"] || p["PIC Name"] || ""}>
                               {p["PIC Short Name"] || p["PIC Name"] || "—"}
                             </td>
-                            <td className="py-2.5 px-2">
-                              {getDevStatus(p)}
+                            <td className="px-3 align-top">
+                              <div className="status-badge text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 uppercase tracking-tight inline-block whitespace-nowrap">
+                                {p["Last Status"] || "—"}
+                              </div>
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-xs">
+                            <td className="px-3 text-right font-mono text-xs align-top">
                               {getDelayVal(p)}
                             </td>
-                            <td className="py-2.5 px-3 text-left text-[11px] text-gray-500 min-w-[180px] whitespace-normal break-words" title={p["(Dev) Kategori Alasan Terlambat >=2022"] || ""}>
-                              {p["(Dev) Kategori Alasan Terlambat >=2022"] ? String(p["(Dev) Kategori Alasan Terlambat >=2022"]).trim() || "-" : "-"}
+                            <td className="px-3 text-left text-[11px] text-slate-600 leading-[1.4] whitespace-normal break-words align-top" title={getProfessionalReason(p["(Dev) Kategori Alasan Terlambat >=2022"] || "")}>
+                              {getProfessionalReason(p["(Dev) Kategori Alasan Terlambat >=2022"] || "")}
                             </td>
                           </tr>
                         ))}
                         {projs2026.length === 0 && (
-                          <tr>
-                            <td colSpan={6} className="py-12 text-center text-xs text-gray-400 italic">
+                          <tr className="grid grid-cols-1">
+                            <td className="py-12 text-center text-xs text-gray-400 italic">
                               No Year 2026 projects available for the current filter scope.
                             </td>
                           </tr>
