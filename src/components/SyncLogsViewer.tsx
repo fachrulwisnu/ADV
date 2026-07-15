@@ -13,13 +13,14 @@ const getSupabaseClientClientSide = () => {
 };
 
 interface LogItem {
-  id: number;
+  id: string;
+  notion_page_id: string;
   ticket: string;
   project_name: string;
-  field_changed: string;
+  change_category: string;
   old_value: string;
   new_value: string;
-  synced_at: string;
+  created_at: string;
 }
 
 interface SyncLogsViewerProps {
@@ -41,9 +42,9 @@ export function SyncLogsViewer({ refreshTrigger }: SyncLogsViewerProps) {
       }
 
       const { data, error: dbError } = await supabase
-        .from("project_update_logs")
+        .from("project_audit_logs")
         .select("*")
-        .order("synced_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(50);
 
       if (dbError) {
@@ -62,18 +63,34 @@ export function SyncLogsViewer({ refreshTrigger }: SyncLogsViewerProps) {
     fetchLogs();
   }, [refreshTrigger]);
 
-  const getBadgeStyle = (field: string) => {
-    const f = field.toLowerCase();
-    if (f.includes("status")) {
+  const getBadgeStyle = (category: string) => {
+    const c = (category || "").toUpperCase();
+    if (c === "STATUS") {
       return "bg-amber-50 text-amber-700 border-amber-150";
     }
-    if (f.includes("milestone")) {
+    if (c === "MILESTONE") {
       return "bg-blue-50 text-blue-700 border-blue-150";
     }
-    if (f.includes("new") || f.includes("create")) {
+    if (c === "NEW_PROJECT") {
       return "bg-emerald-50 text-emerald-700 border-emerald-150";
     }
-    return "bg-purple-50 text-purple-700 border-purple-150";
+    if (c === "PIC") {
+      return "bg-purple-50 text-purple-700 border-purple-150";
+    }
+    if (c === "NAME") {
+      return "bg-indigo-50 text-indigo-700 border-indigo-150";
+    }
+    return "bg-slate-50 text-slate-700 border-slate-150";
+  };
+
+  const formatCategory = (category: string) => {
+    const c = (category || "").toUpperCase();
+    if (c === "STATUS") return "Status Update";
+    if (c === "MILESTONE") return "Milestone Update";
+    if (c === "NEW_PROJECT") return "New Project";
+    if (c === "PIC") return "PIC Update";
+    if (c === "NAME") return "Name Update";
+    return category;
   };
 
   return (
@@ -126,11 +143,11 @@ export function SyncLogsViewer({ refreshTrigger }: SyncLogsViewerProps) {
                 </div>
                 
                 <div className="text-gray-600 font-semibold flex items-center gap-2 flex-wrap">
-                  <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border tracking-wide ${getBadgeStyle(log.field_changed)}`}>
-                    {log.field_changed}
+                  <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border tracking-wide ${getBadgeStyle(log.change_category)}`}>
+                    {formatCategory(log.change_category)}
                   </span>
                   
-                  {log.field_changed === "New Project" ? (
+                  {(log.change_category || "").toUpperCase() === "NEW_PROJECT" ? (
                     <span className="text-emerald-600 font-bold bg-emerald-50/50 px-1.5 py-0.5 rounded border border-emerald-100/50">
                       New record imported
                     </span>
@@ -148,7 +165,7 @@ export function SyncLogsViewer({ refreshTrigger }: SyncLogsViewerProps) {
 
               <div className="text-left sm:text-right shrink-0 select-none">
                 <p className="text-[10px] text-gray-400 font-bold font-mono">
-                  {new Date(log.synced_at).toLocaleString("en-US", {
+                  {new Date(log.created_at).toLocaleString("en-US", {
                     month: "short",
                     day: "numeric",
                     hour: "2-digit",

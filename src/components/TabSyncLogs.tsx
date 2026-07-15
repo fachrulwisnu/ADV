@@ -13,13 +13,14 @@ const getSupabaseClientClientSide = () => {
 };
 
 interface LogItem {
-  id: number;
+  id: string;
+  notion_page_id: string;
   ticket: string;
   project_name: string;
-  field_changed: string;
+  change_category: string;
   old_value: string;
   new_value: string;
-  synced_at: string;
+  created_at: string;
 }
 
 interface TabSyncLogsProps {
@@ -49,9 +50,9 @@ export function TabSyncLogs({ syncTrigger }: TabSyncLogsProps) {
       }
 
       const { data, error: dbError } = await supabase
-        .from("project_update_logs")
+        .from("project_audit_logs")
         .select("*")
-        .order("synced_at", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (dbError) {
         throw dbError;
@@ -93,7 +94,7 @@ export function TabSyncLogs({ syncTrigger }: TabSyncLogsProps) {
 
       const matchesField =
         fieldFilter === "All" ||
-        log.field_changed.toLowerCase() === fieldFilter.toLowerCase();
+        (log.change_category || "").toUpperCase() === fieldFilter.toUpperCase();
 
       return matchesSearch && matchesField;
     });
@@ -113,10 +114,10 @@ export function TabSyncLogs({ syncTrigger }: TabSyncLogsProps) {
     let newProjects = 0;
 
     logs.forEach((log) => {
-      const f = log.field_changed.toLowerCase();
-      if (f.includes("status")) statusChanges++;
-      else if (f.includes("milestone")) milestoneChanges++;
-      else if (f.includes("new") || f.includes("create")) newProjects++;
+      const cat = (log.change_category || "").toUpperCase();
+      if (cat === "STATUS") statusChanges++;
+      else if (cat === "MILESTONE") milestoneChanges++;
+      else if (cat === "NEW_PROJECT") newProjects++;
     });
 
     return {
@@ -127,18 +128,34 @@ export function TabSyncLogs({ syncTrigger }: TabSyncLogsProps) {
     };
   }, [logs]);
 
-  const getBadgeStyle = (field: string) => {
-    const f = field.toLowerCase();
-    if (f.includes("status")) {
+  const getBadgeStyle = (category: string) => {
+    const c = (category || "").toUpperCase();
+    if (c === "STATUS") {
       return "bg-amber-50 text-amber-700 border-amber-200/60";
     }
-    if (f.includes("milestone")) {
+    if (c === "MILESTONE") {
       return "bg-blue-50 text-blue-700 border-blue-200/60";
     }
-    if (f.includes("new") || f.includes("create")) {
+    if (c === "NEW_PROJECT") {
       return "bg-emerald-50 text-emerald-700 border-emerald-200/60";
     }
-    return "bg-purple-50 text-purple-700 border-purple-200/60";
+    if (c === "PIC") {
+      return "bg-purple-50 text-purple-700 border-purple-200/60";
+    }
+    if (c === "NAME") {
+      return "bg-indigo-50 text-indigo-700 border-indigo-200/60";
+    }
+    return "bg-slate-50 text-slate-700 border-slate-200/60";
+  };
+
+  const formatCategory = (category: string) => {
+    const c = (category || "").toUpperCase();
+    if (c === "STATUS") return "Status Update";
+    if (c === "MILESTONE") return "Milestone Update";
+    if (c === "NEW_PROJECT") return "New Project";
+    if (c === "PIC") return "PIC Update";
+    if (c === "NAME") return "Name Update";
+    return category;
   };
 
   return (
@@ -231,9 +248,11 @@ export function TabSyncLogs({ syncTrigger }: TabSyncLogsProps) {
               className="h-9 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600/30 transition-all cursor-pointer"
             >
               <option value="All">Semua Kategori</option>
-              <option value="Status">Status</option>
-              <option value="Milestone">Milestone</option>
-              <option value="New Project">New Project</option>
+              <option value="STATUS">Status Update</option>
+              <option value="MILESTONE">Milestone Update</option>
+              <option value="PIC">PIC Update</option>
+              <option value="NAME">Nama Update</option>
+              <option value="NEW_PROJECT">Project Baru</option>
             </select>
           </div>
         </div>
@@ -277,7 +296,7 @@ export function TabSyncLogs({ syncTrigger }: TabSyncLogsProps) {
                       className="hover:bg-gray-50/40 transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-gray-400 select-none">
-                        {new Date(log.synced_at).toLocaleString("en-US", {
+                        {new Date(log.created_at).toLocaleString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
@@ -297,14 +316,14 @@ export function TabSyncLogs({ syncTrigger }: TabSyncLogsProps) {
                       <td className="px-6 py-4 whitespace-nowrap select-none">
                         <span
                           className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border tracking-wide ${getBadgeStyle(
-                            log.field_changed
+                            log.change_category
                           )}`}
                         >
-                          {log.field_changed}
+                          {formatCategory(log.change_category)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {log.field_changed === "New Project" ? (
+                        {(log.change_category || "").toUpperCase() === "NEW_PROJECT" ? (
                           <span className="text-emerald-600 font-bold bg-emerald-50 border border-emerald-100/50 px-2 py-0.5 rounded-md text-[10.5px]">
                             New Record Imported
                           </span>
