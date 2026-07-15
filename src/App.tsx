@@ -8,6 +8,7 @@ import { TabSla } from "./components/TabSla";
 import { TabCategory } from "./components/TabCategory";
 import { TabProjects } from "./components/TabProjects";
 import { TabSyncLogs } from "./components/TabSyncLogs";
+import { TabSyncLogsView } from "./components/TabSyncLogsView";
 import { createClient } from "@supabase/supabase-js";
 
 // --- Client-side Supabase client ---
@@ -24,21 +25,23 @@ function sanitizeAndLoadMasterJSON(rawJSONData: any[]): any[] {
   if (!rawJSONData || !Array.isArray(rawJSONData)) return [];
 
   return rawJSONData.map((row) => {
+    const cd = row.cleansed_data || row;
     // Standardize division mapping directly from the active JSON structural property keys
-    const rawDiv = row["Owner Div"] || row["Owner Division"] || row["Divisi"] || "";
-    const rawProjectName = row["Project Name"] || row["Nama Project"] || "";
+    const rawDiv = cd["Owner Div"] || cd["Owner Division"] || cd["Divisi"] || row["Owner Div"] || row["Owner Division"] || row["Divisi"] || "";
+    const rawProjectName = row["Project Name"] || row["Nama Project"] || cd["Project Name"] || cd["Nama Project"] || "";
 
     return {
       ...row,
+      "cleansed_data": row.cleansed_data || { ...row },
       "Project Name": rawProjectName.toString().trim(),
       "Owner Div": rawDiv.toString().trim(),
-      "Owner Name": row["Owner Name"] ? String(row["Owner Name"]).trim() : "Unknown Owner",
-      "PIC Name": row["PIC Name"] ? String(row["PIC Name"]).trim() : "Unknown PIC",
-      "Last Status": row["Last Status"] ? String(row["Last Status"]).trim() : "Unknown Status",
-      "Type Project": row["Type Project"] ? String(row["Type Project"]).trim() : "Project Utama",
-      "(FSD) Status": row["(FSD) Status"] ? String(row["(FSD) Status"]).trim() : "",
-      "(Dev) Status": row["(Dev) Status"] ? String(row["(Dev) Status"]).trim() : "",
-      "(SIT) Status": row["(SIT) Status"] ? String(row["(SIT) Status"]).trim() : ""
+      "Owner Name": (cd["Owner Name"] || row["Owner Name"]) ? String(cd["Owner Name"] || row["Owner Name"]).trim() : "Unknown Owner",
+      "PIC Name": (cd["PIC Name"] || row["PIC Name"]) ? String(cd["PIC Name"] || row["PIC Name"]).trim() : "Unknown PIC",
+      "Last Status": (cd["Last Status"] || row["Last Status"]) ? String(cd["Last Status"] || row["Last Status"]).trim() : "Unknown Status",
+      "Type Project": (cd["Type Project"] || row["Type Project"]) ? String(cd["Type Project"] || row["Type Project"]).trim() : "Project Utama",
+      "(FSD) Status": (cd["(FSD) Status"] || row["(FSD) Status"]) ? String(cd["(FSD) Status"] || row["(FSD) Status"]).trim() : "",
+      "(Dev) Status": (cd["(Dev) Status"] || row["(Dev) Status"]) ? String(cd["(Dev) Status"] || row["(Dev) Status"]).trim() : "",
+      "(SIT) Status": (cd["(SIT) Status"] || row["(SIT) Status"]) ? String(cd["(SIT) Status"] || row["(SIT) Status"]).trim() : ""
     };
   });
 }
@@ -86,8 +89,7 @@ export default function App() {
       
       const { data, error } = await supabase
         .from("notion_projects")
-        .select("ticket, project_name, last_status, milestone, created_time, cleansed_data, raw_data, last_synced")
-        .order("last_synced", { ascending: false });
+        .select("notion_page_id, ticket, project_name, owner_division, pic_name, last_status, milestone, cleansed_data");
 
       if (error) {
         throw error;
@@ -97,10 +99,13 @@ export default function App() {
         return {
           "Ticket": dbRow.ticket,
           "Project Name": dbRow.project_name,
+          "Owner Div": dbRow.owner_division,
+          "PIC Name": dbRow.pic_name,
           "Last Status": dbRow.last_status,
           "Milestone": dbRow.milestone,
-          "Created time": dbRow.created_time,
-          ...(dbRow.cleansed_data || dbRow.raw_data)
+          "cleansed_data": dbRow.cleansed_data,
+          "notion_page_id": dbRow.notion_page_id,
+          ...(dbRow.cleansed_data || {})
         };
       });
 
@@ -142,7 +147,7 @@ export default function App() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${supabaseAnonKey}`,
         },
-        body: JSON.stringify({ secret: "ADVDUAR" }),
+        body: JSON.stringify({ secret: "ADVDUAR", trigger: "Manual" }),
       });
 
       if (!response.ok) {
@@ -155,7 +160,8 @@ export default function App() {
       setSyncTrigger((prev) => prev + 1);
 
       if (synced) {
-        triggerAlert(`Sync Successful! ${result.count || synced.length} records processed with ${result.updates || 0} status/milestone updates.`);
+        const count = result.count !== undefined ? result.count : synced.length;
+        triggerAlert(`Success! ${count} records synced.`);
       } else {
         triggerAlert("Successfully triggered sync, but database holds no records.");
       }
@@ -455,7 +461,8 @@ export default function App() {
     { label: "Milestone & SLA", icon: "gauge", description: "" },
     { label: "Kategori & Divisi", icon: "pie", description: "" },
     { label: "Project List", icon: "folder", description: "" },
-    { label: "Sync Logs", icon: "clock", description: "" }
+    { label: "Audit Logs", icon: "clock", description: "" },
+    { label: "Sync Log", icon: "activity", description: "" }
   ];
 
   return (
@@ -679,7 +686,7 @@ export default function App() {
               }`}
             >
               <Icon name="refresh-cw" className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-              {isSyncing ? "Syncing..." : "Sync with Notion"}
+              {isSyncing ? "Syncing... Please wait" : "Sync with Notion"}
             </button>
           </div>
         </header>
@@ -776,6 +783,11 @@ export default function App() {
               {activeTab === 5 && (
                 <React.Fragment key={`tab-5-${rawProjects.length}`}>
                   <TabSyncLogs syncTrigger={syncTrigger} />
+                </React.Fragment>
+              )}
+              {activeTab === 6 && (
+                <React.Fragment key={`tab-6-${rawProjects.length}`}>
+                  <TabSyncLogsView syncTrigger={syncTrigger} />
                 </React.Fragment>
               )}
             </>

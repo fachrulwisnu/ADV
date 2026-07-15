@@ -39,30 +39,33 @@ function parsePercent(val: any): number | null {
 
 // Strictly adheres to the requested sanitization block
 export function sanitizeProjects(data: RawProject[]): SanitizedProject[] {
-  return data.map(d => ({
-    ...d,
-    _year:       getProjectIntakeYear(d),
-    _period:     d["Period"] != null ? d["Period"] : "Unscheduled",
-    _typeGroup: (function(t) {
-      if (!t) return "Other";
-      if (["Enhance Kecil","Hold Enhance Kecil","Antrian Enhance Kecil"].includes(t)) return "Enhance Kecil";
-      if (["Project Utama","Hold Project Utama","Antrian Project Utama"].includes(t)) return "Project Utama";
-      if (t === "Approval Digital") return "Approval Digital";
-      if (t === "Internal IT") return "Internal IT";
-      return "Other";
-    })(d["Type Project"]),
-    _lateFSD:    parseLate(d["(FSD) Late Days"]),
-    _lateDev:    parseLate(d["(Dev) Late Days"]),
-    _lateSIT:    parseLate(d["(SIT) Late Days"]),
-    _lateUAT:    parseLate(d["(UAT) Late Days"]),
-    _lateLive:   parseLate(d["Live (Late Days)"]),
-    _achDev:     parsePercent(d["Achieved Dev %"]),
-    _achFSD:     parsePercent(d["Achieved FSD %"]),
-    _achLive:    parsePercent(d["Achieved Live"]),
-    _achSIT:     parsePercent(d["Achieved SIT %"]),
-    _achUAT:     parsePercent(d["Achieved UAT %"]),
-    _feedback:   (d["Rata-rata Nilai Feedback User : "] && d["Rata-rata Nilai Feedback User : "] > 0) ? d["Rata-rata Nilai Feedback User : "] : null
-  }));
+  return data.map(d => {
+    const cd = d.cleansed_data || d;
+    return {
+      ...d,
+      _year:       getProjectIntakeYear(d),
+      _period:     (cd["Period"] != null ? cd["Period"] : d["Period"]) != null ? (cd["Period"] != null ? cd["Period"] : d["Period"]) : "Unscheduled",
+      _typeGroup: (function(t) {
+        if (!t) return "Other";
+        if (["Enhance Kecil","Hold Enhance Kecil","Antrian Enhance Kecil"].includes(t)) return "Enhance Kecil";
+        if (["Project Utama","Hold Project Utama","Antrian Project Utama"].includes(t)) return "Project Utama";
+        if (t === "Approval Digital") return "Approval Digital";
+        if (t === "Internal IT") return "Internal IT";
+        return "Other";
+      })(cd["Type Project"] ?? d["Type Project"]),
+      _lateFSD:    parseLate(cd["(FSD) Late Days"] ?? d["(FSD) Late Days"]),
+      _lateDev:    parseLate(cd["(Dev) Late Days"] ?? d["(Dev) Late Days"]),
+      _lateSIT:    parseLate(cd["(SIT) Late Days"] ?? d["(SIT) Late Days"]),
+      _lateUAT:    parseLate(cd["(UAT) Late Days"] ?? d["(UAT) Late Days"]),
+      _lateLive:   parseLate(cd["Live (Late Days)"] ?? d["Live (Late Days)"]),
+      _achDev:     parsePercent(cd["Achieved Dev %"] ?? d["Achieved Dev %"]),
+      _achFSD:     parsePercent(cd["Achieved FSD %"] ?? d["Achieved FSD %"]),
+      _achLive:    parsePercent(cd["Achieved Live"] ?? d["Achieved Live"]),
+      _achSIT:     parsePercent(cd["Achieved SIT %"] ?? d["Achieved SIT %"]),
+      _achUAT:     parsePercent(cd["Achieved UAT %"] ?? d["Achieved UAT %"]),
+      _feedback:   ((cd["Rata-rata Nilai Feedback User : "] ?? d["Rata-rata Nilai Feedback User : "]) && Number(cd["Rata-rata Nilai Feedback User : "] ?? d["Rata-rata Nilai Feedback User : "]) > 0) ? Number(cd["Rata-rata Nilai Feedback User : "] ?? d["Rata-rata Nilai Feedback User : "]) : null
+    };
+  });
 }
 
 const MONTH_MAP_LOWER: Record<string, number> = {

@@ -938,7 +938,7 @@ export function TabCategory({
                           }
 
                           return (
-                            <tr key={`${p["Ticket"] || "pt"}-${runningNo}`} className="hover:bg-gray-50/50 transition-colors text-gray-700">
+                            <tr key={`${p.notion_page_id || p["Ticket"] || "pt"}-${runningNo}`} className="hover:bg-gray-50/50 transition-colors text-gray-700">
                               <td className="py-3 px-4 text-center font-mono font-bold text-gray-400 whitespace-normal break-words">
                                 {runningNo++}
                               </td>

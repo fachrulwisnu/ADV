@@ -5,47 +5,48 @@
 export function getGlobalProjectDate(d: any): string {
   if (!d) return "-";
   
+  const cd = d.cleansed_data || d;
   // Normalize the status string to prevent case-sensitivity or trimming bugs
-  const status = d["Last Status"] ? String(d["Last Status"]).trim().toLowerCase() : "";
+  const status = cd["Last Status"] ? String(cd["Last Status"]).trim().toLowerCase() : "";
   
   // Base master fallback date to guarantee no row ever turns up blank
-  const standardFallback = d["Target/Realized Date"] || "";
+  const standardFallback = cd["Target/Realized Date"] || "";
 
   // 1. CHANGE REQUEST ON PROGRESS
   if (status.includes("change request")) {
-    return d["(Change Request) Plan in Week"] || d["Last Update"] || standardFallback || "-";
+    return cd["(Change Request) Plan in Week"] || cd["Last Update"] || standardFallback || "-";
   }
 
   // 2. FSD ON PROGRESS
   if (status.includes("fsd")) {
-    return d["(FSD) Plan in Week"] || 
-           d["(FSD) Realized in Date Diisi saat Approval Digital FSD by Owner selesai"] || 
-           d["FSD) Realized in Date Diisi saat Approval Digital FSD by Owner selesai"] || 
+    return cd["(FSD) Plan in Week"] || 
+           cd["(FSD) Realized in Date Diisi saat Approval Digital FSD by Owner selesai"] || 
+           cd["FSD) Realized in Date Diisi saat Approval Digital FSD by Owner selesai"] || 
            standardFallback || "-";
   }
   
   // 3. DEV / DEVELOPMENT ON PROGRESS
   if (status.includes("dev") || status.includes("development")) {
-    return d["(Dev) Plan in Week"] || 
-           d["(Dev) Realized In Date"] || 
-           d["(Dev) Realized Date"] || 
-           d["(Dev) Realized in date"] || 
+    return cd["(Dev) Plan in Week"] || 
+           cd["(Dev) Realized In Date"] || 
+           cd["(Dev) Realized Date"] || 
+           cd["(Dev) Realized in date"] || 
            standardFallback || "-";
   }
   
   // 4. SIT ON PROGRESS
   if (status.includes("sit")) {
-    return d["(SIT) Plan in Week"] || 
-           d["(SIT) Batch.\nMisal isinya :\n1 (21-11-2021 to 24-11-2021)\n2 (28-11-2021 to 01-12-2021)"] || 
-           d["(SIT) Realized in date"] || 
-           d["(SIT) Realized in Date"] || 
+    return cd["(SIT) Plan in Week"] || 
+           cd["(SIT) Batch.\nMisal isinya :\n1 (21-11-2021 to 24-11-2021)\n2 (28-11-2021 to 01-12-2021)"] || 
+           cd["(SIT) Realized in date"] || 
+           cd["(SIT) Realized in Date"] || 
            standardFallback || "-";
   }
   
   // 5. UAT ON PROGRESS / UAT STAGES
   if (status.includes("uat")) {
     if (status.includes("progress") || status.includes("active") || status === "uat on progress") {
-      let rawBatchData = d["(UAT) Batch\nMisal isinya :\n1 (23-11-2021)\n2 (29-11-2021, dilanjutkan 02-12-2021)"] || d["Target/Realized Date"] || "";
+      let rawBatchData = cd["(UAT) Batch\nMisal isinya :\n1 (23-11-2021)\n2 (29-11-2021, dilanjutkan 02-12-2021)"] || cd["Target/Realized Date"] || "";
       
       if (rawBatchData && rawBatchData !== "-") {
         let formattedBatch = rawBatchData.toString()
@@ -61,25 +62,25 @@ export function getGlobalProjectDate(d: any): string {
       return "UAT On Queue (Menunggu Jadwal Owner)";
     }
     
-    return d["(UAT) Progress Updated"] || d["(UAT) Realized In Date"] || standardFallback || "-";
+    return cd["(UAT) Progress Updated"] || cd["(UAT) Realized In Date"] || standardFallback || "-";
   }
   
   // 6. LIVE STAGE
   if (status === "live") {
-    return d["(Live) Realized in date"] || 
-           d["(Live) Realized in Date"] || 
+    return cd["(Live) Realized in date"] || 
+           cd["(Live) Realized in Date"] || 
            standardFallback || "-";
   }
   
   // 7. LIVE MONITORING / MONITORING AFTER LIVE STAGES
   if (status.includes("live monitoring") || status.includes("monitoring after live")) {
-    const primaryMonDate = d["(Mon After Live) Realized In Date"] || 
-                           d["(Mon After Live) Realized in Date"] || 
-                           d["(Mon After Live) Realized in date"];
+    const primaryMonDate = cd["(Mon After Live) Realized In Date"] || 
+                           cd["(Mon After Live) Realized in Date"] || 
+                           cd["(Mon After Live) Realized in date"];
     if (primaryMonDate && primaryMonDate.trim() !== "") {
       return primaryMonDate;
     } else {
-      const durationText = d["Monitoring After Live\n15, 30, 60 Hari (Kecil/Menengah/Besar)"];
+      const durationText = cd["Monitoring After Live\n15, 30, 60 Hari (Kecil/Menengah/Besar)"];
       return durationText ? `Live on Monitoring on Progress until : ${durationText}` : (standardFallback || "In Monitoring Phase");
     }
   }
@@ -107,34 +108,36 @@ export function formatLogWithNewLines(text: string | null | undefined): string {
  */
 export function getGlobalProgressUpdate(d: any): string {
   if (!d) return "-";
-  const status = d["Last Status"] ? String(d["Last Status"]).trim().toLowerCase() : "";
+  const cd = d.cleansed_data || d;
+  const status = cd["Last Status"] ? String(cd["Last Status"]).trim().toLowerCase() : "";
   
   let rawLog = "-";
   if (status.includes("change request")) {
-    rawLog = d["(Change Request) Progress Updated"] || d["Progress Updated"] || "-";
+    rawLog = cd["(Change Request) Progress Updated"] || cd["Progress Updated"] || "-";
   } else if (status.includes("fsd")) {
-    rawLog = d["(FSD) Progress Updated"] || d["Progress Updated"] || "-";
+    rawLog = cd["(FSD) Progress Updated"] || cd["Progress Updated"] || "-";
   } else if (status.includes("dev") || status.includes("development")) {
-    rawLog = d["(Dev) Progress Updated"] || d["Progress Updated"] || "-";
+    rawLog = cd["(Dev) Progress Updated"] || cd["Progress Updated"] || "-";
   } else if (status.includes("sit")) {
-    rawLog = d["(SIT) Progress Updated"] || d["Progress Updated"] || "-";
+    rawLog = cd["(SIT) Progress Updated"] || cd["Progress Updated"] || "-";
   } else if (status.includes("uat")) {
-    rawLog = d["(UAT) Progress Updated"] || d["Progress Updated"] || "-";
+    rawLog = cd["(UAT) Progress Updated"] || cd["Progress Updated"] || "-";
   } else if (status.includes("live") || status.includes("monitoring")) {
-    rawLog = d["(Live) Progress Updated"] || d["Progress Updated"] || "-";
+    rawLog = cd["(Live) Progress Updated"] || cd["Progress Updated"] || "-";
   } else {
-    rawLog = d["Progress Updated"] || "-";
+    rawLog = cd["Progress Updated"] || "-";
   }
 
   return formatLogWithNewLines(rawLog);
 }
 
 export function getProjectIntakeYear(d: any): string {
+  const cd = d.cleansed_data || d;
   // Extract the raw ticket value safely from either key variant
-  const ticketStr = String(d["No Ticket"] || d["Ticket"] || "").trim();
+  const ticketStr = String(cd["No Ticket"] || cd["Ticket"] || d["No Ticket"] || d["Ticket"] || "").trim();
   
   // Base operational year fallback from the dataset if available
-  let assignedYear = d["Year"] || d["Tahun"] || d["SIT SLA YEAR"] || "";
+  let assignedYear = cd["Year"] || cd["Tahun"] || cd["SIT SLA YEAR"] || d["Year"] || d["Tahun"] || d["SIT SLA YEAR"] || "";
   
   // Rule: If the year is blank, marked as "Unscheduled", or 0, extract it directly from the Ticket ID
   if (!assignedYear || assignedYear === "-" || assignedYear.toString().toLowerCase().includes("un") || assignedYear === 0 || assignedYear === "0") {
@@ -169,6 +172,7 @@ export function formatUATBatchText(text: string | null | undefined): string {
 }
 
 export function calculateProjectAverageScore(item: any): number | null {
+  const cd = item?.cleansed_data || item;
   // Define the exact 11 feedback descriptor tokens from the JSON schema
   const feedbackKeys = [
     "Nilai Feedback User :\nDapat berkolaborasi dengan Department lain dengan baik dalam Project",
@@ -188,8 +192,8 @@ export function calculateProjectAverageScore(item: any): number | null {
   let validKeysCount = 0;
 
   feedbackKeys.forEach(key => {
-    if (item && item[key] !== undefined && item[key] !== null) {
-      const score = parseFloat(item[key]);
+    if (cd && cd[key] !== undefined && cd[key] !== null) {
+      const score = parseFloat(cd[key]);
       // Only accumulate if the score is a valid number, greater than 0, and capped at 5
       if (!isNaN(score) && score > 0) {
         // Defensive handling: if any old data mistakenly uses a 100 scale, normalize it immediately
@@ -210,9 +214,10 @@ export function calculateProjectAverageScore(item: any): number | null {
 export function getActiveSlaPool(dataset: any[]): any[] {
   if (!dataset) return [];
   return dataset.filter(item => {
+    const cd = item.cleansed_data || item;
     // 1. Normalize status checks
-    const status = (item["Last Status"] || "").trim().toLowerCase();
-    const milestone = (item["Milestone"] || "").trim().toUpperCase();
+    const status = (cd["Last Status"] || item["Last Status"] || "").trim().toLowerCase();
+    const milestone = (cd["Milestone"] || item["Milestone"] || "").trim().toUpperCase();
     
     // 2. Define Exclusion Rule: Canceled projects must never affect SLA
     const isCanceled = status === "canceled" || milestone === "CANCELED";

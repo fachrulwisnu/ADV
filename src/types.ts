@@ -10,6 +10,8 @@ export interface RawProject {
   "Milestone": string;
   "Status PMA": string;
   "Prioritas Mgmt": string;
+  "cleansed_data"?: any;
+  "notion_page_id"?: string;
 
   "Year": number | null;
   "Period": string | null;
