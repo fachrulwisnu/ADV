@@ -153,6 +153,14 @@ async function startServer() {
 
       if (allResults.length === 0) {
         console.log("No new updates found in Notion since last sync.");
+        try {
+          await supabase.from('worker_heartbeats').insert([{ 
+            status: 'SUCCESS', 
+            message: "No new updates found." 
+          }]);
+        } catch (heartbeatErr) {
+          console.error("Failed to insert empty success heartbeat:", heartbeatErr);
+        }
         res.json({ success: true, count: 0, message: "No new updates found." });
         return;
       }
@@ -277,9 +285,24 @@ async function startServer() {
         }
       }
 
+      try {
+        await supabase.from('worker_heartbeats').insert([{ 
+          status: 'SUCCESS', 
+          message: `Synced ${uniqueFormattedData.length} records. Updates found: ${updateLogs.length}` 
+        }]);
+      } catch (heartbeatErr) {
+        console.error("Failed to insert success heartbeat:", heartbeatErr);
+      }
+
       res.json({ success: true, count: uniqueFormattedData.length, updates: updateLogs.length });
     } catch (error: any) {
       console.error("Sync error:", error);
+      try {
+        const supabase = getSupabaseClient();
+        await supabase.from('worker_heartbeats').insert([{ status: 'FAILED', message: error.message || 'Unknown error' }]);
+      } catch (heartbeatErr) {
+        console.error("Failed to insert failed heartbeat:", heartbeatErr);
+      }
       res.status(500).json({ success: false, message: error.message });
     }
   });
@@ -308,6 +331,27 @@ async function startServer() {
       res.json(data || []);
     } catch (error: any) {
       console.error("Fetch logs error:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  // API Route: Fetch worker heartbeats from Supabase
+  app.get("/api/worker-heartbeats", async (req, res) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from("worker_heartbeats")
+        .select("*")
+        .order("ran_at", { ascending: false })
+        .limit(20);
+        
+      if (error) {
+        throw error;
+      }
+
+      res.json(data || []);
+    } catch (error: any) {
+      console.error("Fetch heartbeats error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   });

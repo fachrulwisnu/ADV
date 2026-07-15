@@ -8,6 +8,8 @@ import { TabSla } from "./components/TabSla";
 import { TabCategory } from "./components/TabCategory";
 import { TabProjects } from "./components/TabProjects";
 import { TabSyncLogs } from "./components/TabSyncLogs";
+import { NotificationBell } from "./components/NotificationBell";
+import { TabWorkerStatus } from "./components/TabWorkerStatus";
 
 function sanitizeAndLoadMasterJSON(rawJSONData: any[]): any[] {
   if (!rawJSONData || !Array.isArray(rawJSONData)) return [];
@@ -64,6 +66,13 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncLogsOpen, setIsSyncLogsOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (activeTab === 5 || activeTab === 6) {
+      setIsSyncLogsOpen(true);
+    }
+  }, [activeTab]);
 
   const fetchDataFromSupabase = async () => {
     setIsLoading(true);
@@ -399,7 +408,8 @@ export default function App() {
     { label: "Milestone & SLA", icon: "gauge", description: "" },
     { label: "Kategori & Divisi", icon: "pie", description: "" },
     { label: "Project List", icon: "folder", description: "" },
-    { label: "Sync Logs", icon: "clock", description: "" }
+    { label: "Change Logs", icon: "clock", description: "" },
+    { label: "Worker Status", icon: "activity", description: "" }
   ];
 
   return (
@@ -471,7 +481,7 @@ export default function App() {
 
         {/* Navigation Sidebar List */}
         <nav className="flex-1 px-3.5 py-4 space-y-1">
-          {tabs.map((t, idx) => {
+          {tabs.slice(0, 5).map((t, idx) => {
             const isActive = activeTab === idx;
             return (
               <button
@@ -490,15 +500,62 @@ export default function App() {
                   <span className="text-[12.5px] font-bold block leading-none font-display">
                     {t.label}
                   </span>
-                  {t.description && (
-                    <span className={`text-[10px] block mt-0.5 font-medium ${isActive ? "text-white/70" : "text-gray-400"}`}>
-                      {t.description}
-                    </span>
-                  )}
                 </div>
               </button>
             );
           })}
+
+          {/* Accordion / Dropdown Group for Worker Monitoring */}
+          <div className="pt-1">
+            <button
+              onClick={() => setIsSyncLogsOpen(!isSyncLogsOpen)}
+              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-left transition-all duration-150 group cursor-pointer ${
+                activeTab === 5 || activeTab === 6
+                  ? "text-blue-600 bg-blue-50/50"
+                  : "text-gray-500 hover:bg-gray-55/40 hover:text-gray-900"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-1.5 rounded-lg ${activeTab === 5 || activeTab === 6 ? "bg-blue-100 text-blue-600" : "text-gray-400 group-hover:text-blue-600"}`}>
+                  <Icon name="clock" className="w-4 h-4 stroke-[1.8px]" />
+                </div>
+                <div>
+                  <span className="text-[12.5px] font-bold block leading-none font-display">
+                    Worker Monitoring
+                  </span>
+                </div>
+              </div>
+              <Icon 
+                name="chevron" 
+                className={`w-3 h-3 text-gray-450 transition-transform duration-200 ${isSyncLogsOpen ? "rotate-95 text-blue-600" : ""}`} 
+              />
+            </button>
+
+            {isSyncLogsOpen && (
+              <div className="pl-4 mt-1 space-y-1 border-l-2 border-gray-100 ml-5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <button
+                  onClick={() => setActiveTab(5)}
+                  className={`w-full px-3 py-2 rounded-lg text-left text-xs font-bold transition-all duration-150 cursor-pointer ${
+                    activeTab === 5
+                      ? "text-blue-600 bg-blue-50/80 font-extrabold"
+                      : "text-gray-400 hover:bg-gray-50 hover:text-gray-700"
+                  }`}
+                >
+                  Change Logs
+                </button>
+                <button
+                  onClick={() => setActiveTab(6)}
+                  className={`w-full px-3 py-2 rounded-lg text-left text-xs font-bold transition-all duration-150 cursor-pointer ${
+                    activeTab === 6
+                      ? "text-blue-600 bg-blue-50/80 font-extrabold"
+                      : "text-gray-400 hover:bg-gray-50 hover:text-gray-700"
+                  }`}
+                >
+                  Worker Status
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
 
         {/* Reset / Branding bottom panel */}
@@ -615,6 +672,11 @@ export default function App() {
               </div>
             </div>
 
+            <NotificationBell
+              onViewAllLogs={() => setActiveTab(5)}
+              syncTrigger={syncTrigger}
+            />
+
             <button
               onClick={handleManualSync}
               disabled={isSyncing}
@@ -720,6 +782,11 @@ export default function App() {
               {activeTab === 5 && (
                 <React.Fragment key={`tab-5-${rawProjects.length}`}>
                   <TabSyncLogs syncTrigger={syncTrigger} />
+                </React.Fragment>
+              )}
+              {activeTab === 6 && (
+                <React.Fragment key={`tab-6-${rawProjects.length}`}>
+                  <TabWorkerStatus syncTrigger={syncTrigger} />
                 </React.Fragment>
               )}
             </>

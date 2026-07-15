@@ -82,6 +82,14 @@ CREATE TABLE public.project_update_logs (
     new_value TEXT,
     synced_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Tabel Worker Heartbeats / Monitoring
+CREATE TABLE public.worker_heartbeats (
+    id SERIAL PRIMARY KEY,
+    ran_at TIMESTAMPTZ DEFAULT NOW(),
+    status VARCHAR NOT NULL,
+    message TEXT
+);
 ```
 
 ### Jalankan Aplikasi (Development)
