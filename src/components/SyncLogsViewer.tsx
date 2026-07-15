@@ -1,5 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { Card, Icon } from "./UI";
+import { createClient } from "@supabase/supabase-js";
+
+// --- Client-side Supabase client helper ---
+const getSupabaseClientClientSide = () => {
+  const metaEnv = (import.meta as any).env || {};
+  const url = metaEnv.VITE_NEXT_PUBLIC_SUPABASE_URL || 
+              metaEnv.VITE_SUPABASE_URL || 
+              (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL) : '') ||
+              '';
+              
+  const key = metaEnv.VITE_SUPABASE_SERVICE_ROLE_KEY || 
+              metaEnv.VITE_SUPABASE_ANON_KEY || 
+              (typeof process !== 'undefined' ? (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY) : '') ||
+              '';
+              
+  if (!url || !key) {
+    return null;
+  }
+  return createClient(url, key);
+};
 
 interface LogItem {
   id: number;
@@ -24,13 +44,34 @@ export function SyncLogsViewer({ refreshTrigger }: SyncLogsViewerProps) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/sync-logs?limit=50");
-      if (res.ok) {
-        const data = await res.json();
-        setLogs(data || []);
-      } else {
-        setError("Failed to load logs");
+      try {
+        const res = await fetch("/api/sync-logs?limit=50");
+        if (res.ok) {
+          const data = await res.json();
+          setLogs(data || []);
+          setIsLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("Proxy /api/sync-logs?limit=50 failed, falling back to direct Supabase fetch", err);
       }
+
+      const supabase = getSupabaseClientClientSide();
+      if (!supabase) {
+        throw new Error("Supabase client could not be initialized");
+      }
+
+      const { data, error: dbError } = await supabase
+        .from("project_update_logs")
+        .select("*")
+        .order("synced_at", { ascending: false })
+        .limit(50);
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      setLogs(data || []);
     } catch (err: any) {
       setError(err.message || "Network error");
     } finally {
