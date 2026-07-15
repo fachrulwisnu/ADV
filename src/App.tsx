@@ -10,64 +10,15 @@ import { TabProjects } from "./components/TabProjects";
 import { TabSyncLogs } from "./components/TabSyncLogs";
 import { createClient } from "@supabase/supabase-js";
 
-// --- Client-side Supabase client and helper functions ---
+// --- Client-side Supabase client ---
 const getSupabaseClientClientSide = () => {
-  const metaEnv = (import.meta as any).env || {};
-  const url = metaEnv.VITE_NEXT_PUBLIC_SUPABASE_URL || 
-              metaEnv.VITE_SUPABASE_URL || 
-              (typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL) : '') ||
-              '';
-              
-  const key = metaEnv.VITE_SUPABASE_SERVICE_ROLE_KEY || 
-              metaEnv.VITE_SUPABASE_ANON_KEY || 
-              (typeof process !== 'undefined' ? (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY) : '') ||
-              '';
-              
+  const url = import.meta.env.VITE_SUPABASE_URL || '';
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
   if (!url || !key) {
     return null;
   }
   return createClient(url, key);
 };
-
-// --- TRANSFORM: Robust Cleansing helper function ---
-function extractNotionValue(prop: any): any {
-  if (!prop) return null;
-  switch (prop.type) {
-    case 'title': 
-      return prop.title?.map((t: any) => t.plain_text).join("") || null;
-    case 'rich_text': 
-      return prop.rich_text?.map((t: any) => t.plain_text).join("") || null;
-    case 'select': 
-      return prop.select?.name || null;
-    case 'multi_select': 
-      return prop.multi_select?.map((s: any) => s.name).join(", ") || null;
-    case 'date': 
-      return prop.date?.start || null;
-    case 'number': 
-      return prop.number !== null && prop.number !== undefined ? prop.number : null;
-    case 'status': 
-      return prop.status?.name || null;
-    case 'formula': 
-      return prop.formula?.type === 'string' 
-        ? prop.formula.string 
-        : prop.formula?.number !== undefined 
-          ? prop.formula.number 
-          : null;
-    case 'checkbox': 
-      return prop.checkbox || false;
-    default: 
-      return null;
-  }
-}
-
-// --- HELPER: Chunk Array for Batch Inserts ---
-function chunkArray<T>(array: T[], size: number): T[][] {
-  const chunked: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunked.push(array.slice(i, i + size));
-  }
-  return chunked;
-}
 
 function sanitizeAndLoadMasterJSON(rawJSONData: any[]): any[] {
   if (!rawJSONData || !Array.isArray(rawJSONData)) return [];
@@ -128,22 +79,6 @@ export default function App() {
   const fetchDataFromSupabase = async () => {
     setIsLoading(true);
     try {
-      try {
-        const res = await fetch("/api/projects");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            const sanitized = sanitizeAndLoadMasterJSON(data);
-            window.rawMasterDataset = sanitized;
-            setRawProjects(sanitized);
-            setIsCustomLoaded(data.length > 0);
-            return sanitized;
-          }
-        }
-      } catch (err) {
-        console.warn("Proxy /api/projects failed, falling back to direct Supabase fetch", err);
-      }
-
       const supabase = getSupabaseClientClientSide();
       if (!supabase) {
         throw new Error("Supabase client could not be initialized");
@@ -186,198 +121,36 @@ export default function App() {
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
-      // 1. Try to sync via server-side API first
-      try {
-        const res = await fetch("/api/sync-notion", { method: "POST" });
-        if (res.ok) {
-          const result = await res.json().catch(() => ({}));
-          const synced = await fetchDataFromSupabase();
-          setSyncTrigger((prev) => prev + 1);
-          if (synced) {
-            triggerAlert(`${synced.length} Records Synced successfully from Notion to Supabase! Found ${result.updates || 0} modifications.`);
-          } else {
-            triggerAlert("Successfully triggered sync, but database holds no records.");
-          }
-          setIsSyncing(false);
-          return;
-        } else if (res.status !== 404) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(errJson.message || `Server error ${res.status}`);
-        }
-      } catch (err: any) {
-        console.warn("Proxy sync failed, falling back to direct client-side sync:", err.message);
-      }
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://rjiklnmfdwxgnqalfhif.supabase.co';
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-      // 2. Client-Side Direct Sync Fallback (Bypassing any /api/ route)
-      const supabase = getSupabaseClientClientSide();
-      if (!supabase) {
-        throw new Error("Supabase client-side credentials missing or invalid.");
-      }
-
-      const metaEnv = (import.meta as any).env || {};
-      const databaseId = metaEnv.VITE_NOTION_DATABASE_ID || 
-                         (typeof process !== 'undefined' ? process.env.NOTION_DATABASE_ID : '');
-      const notionApiKey = metaEnv.VITE_NOTION_API_KEY || 
-                           (typeof process !== 'undefined' ? process.env.NOTION_API_KEY : '');
-
-      if (!databaseId || !notionApiKey) {
-        throw new Error("NOTION_DATABASE_ID and NOTION_API_KEY environment variables are required.");
-      }
-
-      console.log("Starting direct client-side sync with Notion...");
-
-      // Fetch Existing Data from Supabase for Comparison
-      let existingData: any[] = [];
-      try {
-        const { data, error } = await supabase.from("notion_projects").select("ticket, last_status, milestone");
-        if (error) {
-          console.warn("Could not fetch existing projects:", error.message);
-        } else {
-          existingData = data || [];
-        }
-      } catch (e: any) {
-        console.warn("Supabase fetch failed during compare setup:", e.message);
-      }
-      
-      const existingMap = new Map(existingData.map(item => [item.ticket, item]));
-
-      // Pagination Loop: Fetch ALL records directly from Notion API
-      let allResults: any[] = [];
-      let hasMore = true;
-      let nextCursor: string | undefined = undefined;
-
-      while (hasMore) {
-        const requestBody: any = nextCursor ? { start_cursor: nextCursor } : {};
-        const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${notionApiKey}`,
-            "Notion-Version": "2022-06-28",
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`Notion API Error (${response.status}): ${errText}`);
-        }
-        
-        const data = await response.json() as any;
-        if (data.results && Array.isArray(data.results)) {
-          allResults = [...allResults, ...data.results];
-        }
-        hasMore = data.has_more;
-        nextCursor = data.next_cursor;
-      }
-
-      if (allResults.length === 0) {
-        throw new Error("No results found in Notion database.");
-      }
-
-      // Map Data and Detect Changes
-      const updateLogs: any[] = [];
-      const formattedData = allResults.map((page: any) => {
-        const props = page.properties;
-        const flatProperties: Record<string, any> = {};
-        for (const key in props) {
-          flatProperties[key] = extractNotionValue(props[key]);
-        }
-
-        const ticket = flatProperties["Ticket"] || page.id;
-        const project_name = flatProperties["Project Name"] || "";
-        const last_status = flatProperties["Last Status"] || "";
-        const milestone = flatProperties["Milestone"] || "";
-        const created_time = props["Created time"]?.date?.start || new Date().toISOString();
-
-        // Compare with existing DB data
-        const oldRecord = existingMap.get(ticket);
-        if (oldRecord) {
-          if (oldRecord.last_status !== last_status) {
-            updateLogs.push({
-              ticket,
-              project_name,
-              field_changed: "Status",
-              old_value: oldRecord.last_status || "Empty",
-              new_value: last_status || "Empty",
-              synced_at: new Date().toISOString()
-            });
-          }
-          if (oldRecord.milestone !== milestone) {
-            updateLogs.push({
-              ticket,
-              project_name,
-              field_changed: "Milestone",
-              old_value: oldRecord.milestone || "Empty",
-              new_value: milestone || "Empty",
-              synced_at: new Date().toISOString()
-            });
-          }
-        } else {
-          updateLogs.push({
-            ticket,
-            project_name,
-            field_changed: "New Project",
-            old_value: "N/A",
-            new_value: "Created",
-            synced_at: new Date().toISOString()
-          });
-        }
-
-        return {
-          ticket,
-          project_name,
-          last_status,
-          milestone,
-          created_time,
-          raw_data: props,
-          cleansed_data: flatProperties,
-          last_synced: new Date().toISOString()
-        };
+      const functionUrl = `${supabaseUrl.replace(/\/$/, "")}/functions/v1/sync-notion`;
+      const response = await fetch(functionUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ secret: "ADVDUAR" }),
       });
 
-      // Batch Upsert to Supabase
-      const uniqueFormattedData = Array.from(
-        new Map(formattedData.map(item => [item.ticket, item])).values()
-      );
-      const BATCH_SIZE = 50;
-      const dataChunks = chunkArray(uniqueFormattedData, BATCH_SIZE);
-
-      for (const chunk of dataChunks) {
-        const { error } = await supabase.from("notion_projects").upsert(chunk, { onConflict: "ticket" });
-        if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
       }
 
-      // Insert Update Logs to Supabase
-      if (updateLogs.length > 0) {
-        const uniqueUpdateLogs = Array.from(
-          new Map(updateLogs.map(log => [`${log.ticket}-${log.field_changed}`, log])).values()
-        );
-        const logChunks = chunkArray(uniqueUpdateLogs, 100);
-        for (const logChunk of logChunks) {
-          const { error: logError } = await supabase.from("project_update_logs").insert(logChunk);
-          if (logError) {
-            console.error("Failed to insert update logs:", logError.message);
-          }
-        }
-      }
-
-      // Refresh frontend state
+      const result = await response.json();
       const synced = await fetchDataFromSupabase();
       setSyncTrigger((prev) => prev + 1);
 
       if (synced) {
-        triggerAlert(`${synced.length} Records Synced successfully directly from Notion to Supabase! Found ${updateLogs.length} modifications.`);
+        triggerAlert(`Sync Successful! ${result.count || synced.length} records processed with ${result.updates || 0} status/milestone updates.`);
       } else {
-        triggerAlert("Successfully triggered direct sync, but database holds no records.");
+        triggerAlert("Successfully triggered sync, but database holds no records.");
       }
     } catch (err: any) {
-      console.error("Client sync failed:", err);
-      if (err instanceof TypeError && err.message.includes("Failed to fetch")) {
-        triggerAlert("Direct Notion sync failed due to CORS restrictions. Please configure a CORS proxy, or ensure your local dev server is running on Port 3000 to proxy requests correctly.");
-      } else {
-        triggerAlert(`Sync failed: ${err.message}`);
-      }
+      console.error("Sync failed:", err);
+      triggerAlert(`Sync failed: ${err.message || err}`);
     } finally {
       setIsSyncing(false);
     }
