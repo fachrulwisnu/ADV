@@ -2,7 +2,7 @@ import React from "react";
 import {
   LayoutGrid, Layers, Gauge, Folder, PieChart, Settings, HelpCircle,
   Inbox, Play, CheckSquare, Activity, Pause, Search, Eye, X, Download,
-  Upload, ChevronRight, AlertTriangle, Users, Calendar, Clock, Sparkles, Check, Percent, Bell
+  Upload, ChevronRight, AlertTriangle, Users, Calendar, Clock, Sparkles, Check, Percent
 } from "lucide-react";
 
 // ---- Dynamic Icon Component maps original strings ----
@@ -40,7 +40,6 @@ export function Icon({ name, className = "w-4 h-4" }: IconProps) {
     case "clock": return <Clock className={className} />;
     case "sparkles": return <Sparkles className={className} />;
     case "percent": return <Percent className={className} />;
-    case "bell": return <Bell className={className} />;
     default: return <Folder className={className} />;
   }
 }

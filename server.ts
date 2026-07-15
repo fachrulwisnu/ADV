@@ -72,7 +72,7 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  // API Route: Sync Notion to Supabase (with Delta Sync and Authorization check)
+  // API Route: Sync Notion to Supabase
   app.post("/api/sync-notion", async (req, res) => {
     try {
       const supabase = getSupabaseClient();
@@ -83,51 +83,30 @@ async function startServer() {
         throw new Error("NOTION_DATABASE_ID and NOTION_API_KEY environment variables are required");
       }
 
-      // Check authorization (if you implemented the secret token)
-      const authHeader = req.headers['authorization'];
-      const expectedSecret = process.env.SYNC_API_SECRET;
-      if (expectedSecret && authHeader !== `Bearer ${expectedSecret}`) {
-        res.status(401).json({ success: false, message: "Unauthorized" });
-        return;
-      }
-
       console.log(`Syncing Notion database: ${databaseId}...`);
-
-      // 1. GET LAST SYNC TIMESTAMP
-      const { data: lastSyncData } = await supabase
-        .from('notion_projects')
-        .select('last_synced')
-        .order('last_synced', { ascending: false })
-        .limit(1);
-
-      let lastSyncIso = null;
-      if (lastSyncData && lastSyncData.length > 0 && lastSyncData[0].last_synced) {
-        // Subtract 5 minutes as a buffer to avoid missing edge-case updates
-        const lastSyncDate = new Date(lastSyncData[0].last_synced);
-        lastSyncDate.setMinutes(lastSyncDate.getMinutes() - 5);
-        lastSyncIso = lastSyncDate.toISOString();
-        console.log(`Performing Delta Sync. Last successful sync (with buffer): ${lastSyncIso}`);
-      } else {
-        console.log("No previous sync found. Performing Full Sync.");
-      }
-
-      // 2. BUILD NOTION FILTER
-      const notionFilter = lastSyncIso ? {
-        filter: {
-          timestamp: "last_edited_time",
-          last_edited_time: {
-            after: lastSyncIso
-          }
+      
+      // 1. Fetch Existing Data from Supabase for Comparison
+      let existingData: any[] = [];
+      try {
+        const { data, error } = await supabase.from("notion_projects").select("ticket, last_status, milestone");
+        if (error) {
+          console.warn("Could not fetch existing projects for comparison (table might be empty or not exists yet):", error.message);
+        } else {
+          existingData = data || [];
         }
-      } : {}; // If no previous sync, fetch everything
+      } catch (e: any) {
+        console.warn("Supabase fetch failed during compare setup:", e.message);
+      }
+      
+      const existingMap = new Map(existingData.map(item => [item.ticket, item]));
 
-      // 3. Pagination Loop: Fetch filtered records from Notion
+      // 2. Pagination Loop: Fetch ALL records from Notion
       let allResults: any[] = [];
       let hasMore = true;
       let nextCursor: string | undefined = undefined;
 
       while (hasMore) {
-        const requestBody: any = nextCursor ? { ...notionFilter, start_cursor: nextCursor } : notionFilter;
+        const requestBody: any = nextCursor ? { start_cursor: nextCursor } : {};
         const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
           method: "POST",
           headers: {
@@ -152,47 +131,12 @@ async function startServer() {
       }
 
       if (allResults.length === 0) {
-        console.log("No new updates found in Notion since last sync.");
-        try {
-          await supabase.from('worker_heartbeats').insert([{ 
-            status: 'SUCCESS', 
-            message: "No new updates found." 
-          }]);
-        } catch (heartbeatErr) {
-          console.error("Failed to insert empty success heartbeat:", heartbeatErr);
-        }
-        res.json({ success: true, count: 0, message: "No new updates found." });
-        return;
+        throw new Error("No results found in Notion database.");
       }
 
       console.log(`Successfully fetched ${allResults.length} records from Notion. Processing...`);
 
-      // 4. FETCH EXISTING DATA FOR LOGGING COMPARISON
-      // Only fetch existing data for the tickets we just retrieved to save bandwidth
-      const incomingTickets = allResults.map(p => {
-        const props = p.properties;
-        const ticketRichText = props["Ticket"]?.rich_text || [];
-        return ticketRichText[0]?.plain_text || p.id;
-      });
-
-      let existingData: any[] = [];
-      try {
-        const { data, error } = await supabase
-          .from("notion_projects")
-          .select("ticket, last_status, milestone")
-          .in("ticket", incomingTickets);
-        if (error) {
-          console.warn("Could not fetch existing projects for comparison:", error.message);
-        } else {
-          existingData = data || [];
-        }
-      } catch (e: any) {
-        console.warn("Supabase fetch failed during compare setup:", e.message);
-      }
-      
-      const existingMap = new Map(existingData.map(item => [item.ticket, item]));
-
-      // 5. Map Data and Detect Changes (TRANSFORM)
+      // 3. Map Data and Detect Changes
       const updateLogs: any[] = [];
       const formattedData = allResults.map((page: any) => {
         const props = page.properties;
@@ -255,7 +199,7 @@ async function startServer() {
         };
       });
 
-      // --- BATCH UPSERT TO PREVENT 57014 TIMEOUT (LOAD) ---
+      // --- FIX APPLIED HERE: BATCH UPSERT TO PREVENT 57014 TIMEOUT ---
       const uniqueFormattedData = Array.from(
         new Map(formattedData.map(item => [item.ticket, item])).values()
       );
@@ -285,24 +229,9 @@ async function startServer() {
         }
       }
 
-      try {
-        await supabase.from('worker_heartbeats').insert([{ 
-          status: 'SUCCESS', 
-          message: `Synced ${uniqueFormattedData.length} records. Updates found: ${updateLogs.length}` 
-        }]);
-      } catch (heartbeatErr) {
-        console.error("Failed to insert success heartbeat:", heartbeatErr);
-      }
-
       res.json({ success: true, count: uniqueFormattedData.length, updates: updateLogs.length });
     } catch (error: any) {
       console.error("Sync error:", error);
-      try {
-        const supabase = getSupabaseClient();
-        await supabase.from('worker_heartbeats').insert([{ status: 'FAILED', message: error.message || 'Unknown error' }]);
-      } catch (heartbeatErr) {
-        console.error("Failed to insert failed heartbeat:", heartbeatErr);
-      }
       res.status(500).json({ success: false, message: error.message });
     }
   });
@@ -331,27 +260,6 @@ async function startServer() {
       res.json(data || []);
     } catch (error: any) {
       console.error("Fetch logs error:", error);
-      res.status(500).json({ success: false, message: error.message });
-    }
-  });
-
-  // API Route: Fetch worker heartbeats from Supabase
-  app.get("/api/worker-heartbeats", async (req, res) => {
-    try {
-      const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-        .from("worker_heartbeats")
-        .select("*")
-        .order("ran_at", { ascending: false })
-        .limit(20);
-        
-      if (error) {
-        throw error;
-      }
-
-      res.json(data || []);
-    } catch (error: any) {
-      console.error("Fetch heartbeats error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   });
