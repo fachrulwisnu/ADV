@@ -84,7 +84,11 @@ export default function App() {
         throw new Error("Supabase client could not be initialized");
       }
       
-      const { data, error } = await supabase.from("notion_projects").select("*");
+      const { data, error } = await supabase
+        .from("notion_projects")
+        .select("ticket, project_name, last_status, milestone, created_time, cleansed_data, raw_data, last_synced")
+        .order("last_synced", { ascending: false });
+
       if (error) {
         throw error;
       }
@@ -107,6 +111,13 @@ export default function App() {
       return sanitized;
     } catch (err: any) {
       console.error("Error loading data from Supabase:", err);
+      
+      if (err?.code === "57014" || err?.message?.includes("57014") || err?.message?.toLowerCase().includes("timeout")) {
+        triggerAlert("Query Timeout (Error 57014): Request took too long to execute. Loaded local fallback dataset.");
+      } else {
+        triggerAlert(`Gagal memuat data: ${err.message || err}`);
+      }
+
       // Fallback to local default dataset
       const sanitizedDefault = sanitizeAndLoadMasterJSON(DEFAULT_RAW_PROJECTS);
       window.rawMasterDataset = sanitizedDefault;
