@@ -7,6 +7,7 @@ import { TabPipeline } from "./components/TabPipeline";
 import { TabSla } from "./components/TabSla";
 import { TabCategory } from "./components/TabCategory";
 import { TabProjects } from "./components/TabProjects";
+import { TabSyncLogs } from "./components/TabSyncLogs";
 
 function sanitizeAndLoadMasterJSON(rawJSONData: any[]): any[] {
   if (!rawJSONData || !Array.isArray(rawJSONData)) return [];
@@ -55,17 +56,64 @@ function getBusinessOperationalData(dataset: any[]): any[] {
 
 export default function App() {
   // ---- Internal Core States ----
-  const [rawProjects, setRawProjects] = useState<any[]>(() => {
-    const sanitized = sanitizeAndLoadMasterJSON(DEFAULT_RAW_PROJECTS);
-    if (typeof window !== "undefined") {
-      window.rawMasterDataset = sanitized;
-    }
-    return sanitized;
-  });
+  const [rawProjects, setRawProjects] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [syncTrigger, setSyncTrigger] = useState(0);
   const [isCustomLoaded, setIsCustomLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState(0); // 0: Overview, 1: Pipeline, 2: SLA, 3: Category, 4: Projects
   const [isDragging, setIsDragging] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const fetchDataFromSupabase = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/projects");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const sanitized = sanitizeAndLoadMasterJSON(data);
+          window.rawMasterDataset = sanitized;
+          setRawProjects(sanitized);
+          setIsCustomLoaded(data.length > 0);
+          return sanitized;
+        }
+      }
+    } catch (err) {
+      console.error("Error loading data from Supabase:", err);
+    } finally {
+      setIsLoading(false);
+    }
+    return null;
+  };
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch("/api/sync-notion", { method: "POST" });
+      if (res.ok) {
+        const result = await res.json().catch(() => ({}));
+        const synced = await fetchDataFromSupabase();
+        setSyncTrigger((prev) => prev + 1);
+        if (synced) {
+          triggerAlert(`${synced.length} Records Synced successfully from Notion to Supabase! Found ${result.updates || 0} modifications.`);
+        } else {
+          triggerAlert("Successfully triggered sync, but database holds no records.");
+        }
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        triggerAlert(`Sync failed: ${errJson.message || "Unknown server error"}`);
+      }
+    } catch (err: any) {
+      triggerAlert(`Sync failed: ${err.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchDataFromSupabase();
+  }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -350,7 +398,8 @@ export default function App() {
     { label: "Pipelines", icon: "layers", description: "" },
     { label: "Milestone & SLA", icon: "gauge", description: "" },
     { label: "Kategori & Divisi", icon: "pie", description: "" },
-    { label: "Project List", icon: "folder", description: "" }
+    { label: "Project List", icon: "folder", description: "" },
+    { label: "Sync Logs", icon: "clock", description: "" }
   ];
 
   return (
@@ -566,20 +615,15 @@ export default function App() {
               </div>
             </div>
 
-            {/* Client-Side HTML5 input click trigger */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              accept=".json"
-              className="hidden"
-            />
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-4 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm cursor-pointer hover:shadow-md active:scale-95 transition-all"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className={`px-4 h-10 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm cursor-pointer hover:shadow-md active:scale-95 transition-all ${
+                isSyncing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+              }`}
             >
-              <Icon name="upload" className="w-3.5 h-3.5" />
-              Unggah File JSON
+              <Icon name="refresh-cw" className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+              {isSyncing ? "Syncing..." : "Sync with Notion"}
             </button>
           </div>
         </header>
@@ -600,72 +644,85 @@ export default function App() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleResetToDefault}
-              className="px-3 py-1 bg-white text-rose-600 border border-rose-100 hover:bg-rose-50 text-[10.5px] font-bold rounded-lg cursor-pointer transition-colors shrink-0"
-            >
-              Reset
-            </button>
           </div>
         )}
 
         {/* Content Screens Container Port */}
         <div className="flex-1 p-6">
-          {activeTab === 0 && (
-            <React.Fragment key={`tab-0-${rawProjects.length}`}>
-              <TabOverview
-                dataset={businessDataset}
-                filteredProjects={businessFilteredProjects}
-                allProjects={businessSanitizedProjects}
-                startMonth={startMonth}
-                endMonth={endMonth}
-                onNavigateToTab={(idx) => setActiveTab(idx)}
-              />
-            </React.Fragment>
-          )}
-          {activeTab === 1 && (
-            <React.Fragment key={`tab-1-${rawProjects.length}`}>
-              <TabPipeline
-                dataset={businessDataset}
-                filteredProjects={businessFilteredProjects}
-              />
-            </React.Fragment>
-          )}
-          {activeTab === 2 && (
-            <React.Fragment key={`tab-2-${rawProjects.length}`}>
-              <TabSla
-                dataset={businessDataset}
-                rawProjects={businessRawProjects}
-                filteredProjects={businessFilteredProjects}
-                allProjects={businessSanitizedProjects}
-                startMonth={startMonth}
-                endMonth={endMonth}
-                startYear={startYear}
-                endYear={endYear}
-                onUploadFile={processUploadedFile}
-              />
-            </React.Fragment>
-          )}
-          {activeTab === 3 && (
-            <React.Fragment key={`tab-3-${rawProjects.length}`}>
-              <TabCategory
-                dataset={businessDataset}
-                rawProjects={businessRawProjects}
-                filteredProjects={businessFilteredProjects}
-                startMonth={startMonth}
-                endMonth={endMonth}
-                startYear={startYear}
-                endYear={endYear}
-                onUploadFile={processUploadedFile}
-              />
-            </React.Fragment>
-          )}
-          {activeTab === 4 && (
-            <React.Fragment key={`tab-4-${rawProjects.length}`}>
-              <TabProjects
-                projects={sanitizeProjects(window.rawMasterDataset || rawProjects || [])}
-              />
-            </React.Fragment>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-450 space-y-4">
+              <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+              <p className="text-sm font-semibold tracking-tight text-gray-500 animate-pulse">
+                Fetching projects from Supabase...
+              </p>
+            </div>
+          ) : (
+            <>
+              {activeTab === 0 && (
+                <React.Fragment key={`tab-0-${rawProjects.length}`}>
+                  <TabOverview
+                    dataset={businessDataset}
+                    filteredProjects={businessFilteredProjects}
+                    allProjects={businessSanitizedProjects}
+                    startMonth={startMonth}
+                    endMonth={endMonth}
+                    startYear={startYear}
+                    endYear={endYear}
+                    onNavigateToTab={(idx) => setActiveTab(idx)}
+                    syncTrigger={syncTrigger}
+                  />
+                </React.Fragment>
+              )}
+              {activeTab === 1 && (
+                <React.Fragment key={`tab-1-${rawProjects.length}`}>
+                  <TabPipeline
+                    dataset={businessDataset}
+                    filteredProjects={businessFilteredProjects}
+                  />
+                </React.Fragment>
+              )}
+              {activeTab === 2 && (
+                <React.Fragment key={`tab-2-${rawProjects.length}`}>
+                  <TabSla
+                    dataset={businessDataset}
+                    rawProjects={businessRawProjects}
+                    filteredProjects={businessFilteredProjects}
+                    allProjects={businessSanitizedProjects}
+                    startMonth={startMonth}
+                    endMonth={endMonth}
+                    startYear={startYear}
+                    endYear={endYear}
+                    onUploadFile={processUploadedFile}
+                  />
+                </React.Fragment>
+              )}
+              {activeTab === 3 && (
+                <React.Fragment key={`tab-3-${rawProjects.length}`}>
+                  <TabCategory
+                    dataset={businessDataset}
+                    rawProjects={businessRawProjects}
+                    filteredProjects={businessFilteredProjects}
+                    startMonth={startMonth}
+                    endMonth={endMonth}
+                    startYear={startYear}
+                    endYear={endYear}
+                    onUploadFile={processUploadedFile}
+                  />
+                </React.Fragment>
+              )}
+              {activeTab === 4 && (
+                <React.Fragment key={`tab-4-${rawProjects.length}`}>
+                  <TabProjects
+                    projects={sanitizeProjects(window.rawMasterDataset || rawProjects || [])}
+                  />
+                </React.Fragment>
+              )}
+              {activeTab === 5 && (
+                <React.Fragment key={`tab-5-${rawProjects.length}`}>
+                  <TabSyncLogs syncTrigger={syncTrigger} />
+                </React.Fragment>
+              )}
+            </>
           )}
         </div>
       </main>

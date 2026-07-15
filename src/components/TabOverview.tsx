@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { DashboardDataset } from "../types";
 import { Card, Icon } from "./UI";
 import { statusGroupOf } from "../parser";
+import { SyncLogsViewer } from "./SyncLogsViewer";
 import { getGlobalProjectDate, getGlobalProgressUpdate, formatLogWithNewLines, getProjectIntakeYear, formatUATBatchText, calculateProjectAverageScore, getActiveSlaPool } from "../utils";
 
 const INCOMING_PROJECTS_DATA = {
@@ -525,6 +526,9 @@ interface TabOverviewProps {
   allProjects?: any[];
   startMonth?: string;
   endMonth?: string;
+  startYear?: number;
+  endYear?: number;
+  syncTrigger?: number;
 }
 
 function ProgressCircle({ pct, color, size = 128, strokeWidth = 12 }: { pct: number; color: string; size?: number; strokeWidth?: number }) {
@@ -601,14 +605,162 @@ function getBusinessOperationalData(dataset: any[]): any[] {
   });
 }
 
-export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allProjects, startMonth, endMonth }: TabOverviewProps) {
+function getStandardizedStatus(rawStatus: any, rawNotes: any): string {
+  const statusStr = (rawStatus || "").toString().toLowerCase();
+  const notesStr = (rawNotes || "").toString().toLowerCase();
+  
+  if (statusStr.includes("pic input caldev cr") || notesStr.includes("pic input caldev cr")) {
+    return "On Development";
+  }
+  
+  return rawStatus || "";
+}
+
+function getStandardizedRemark(rawRemark: any): React.ReactNode {
+  if (!rawRemark) return "—";
+  
+  const remarkStr = rawRemark.toString().trim();
+  
+  // Rule: Alias internal technical status to "On Development" for reporting
+  if (remarkStr.toLowerCase().includes("pic input caldev cr")) {
+    return (
+      <span className="inline-block text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded text-[11px] font-semibold tracking-wide uppercase">
+        On Development
+      </span>
+    );
+  }
+  
+  return remarkStr;
+}
+
+function parseProjectDate(dateString: any): Date | null {
+  if (!dateString) return null;
+  const parsed = new Date(dateString);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getStagePriorityWeight(item: any): number {
+  const fsdStatus = item["(FSD) Status"] ? item["(FSD) Status"].trim().toLowerCase() : "";
+  const devStatus = item["(Dev) Status"] ? item["(Dev) Status"].trim().toLowerCase() : "";
+  const sitStatus = item["(SIT) Status"] ? item["(SIT) Status"].trim().toLowerCase() : "";
+
+  // 1. FSD Stage Active -> Priority 1
+  if (fsdStatus !== "" && fsdStatus !== "done" && !fsdStatus.includes("not start")) {
+    return 1;
+  }
+  // 2. Dev Stage Active -> Priority 2
+  if (devStatus === "on progress" || devStatus.includes("progress")) {
+    return 2;
+  }
+  // 3. SIT Stage Active -> Priority 3
+  if (sitStatus === "on progress" || sitStatus.includes("progress")) {
+    return 3;
+  }
+  // 4. Fallback -> Priority 4
+  return 4;
+}
+
+export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allProjects, startMonth, endMonth, startYear, endYear, syncTrigger }: TabOverviewProps) {
   const { report, kpis, devSla2026, yoySla, feedback, uatRescheduled, goLive } = dataset;
   const list = filteredProjects || [];
 
-  const item2025 = yoySla.find(item => item.year === "2025");
-  const item2026 = yoySla.find(item => item.year === "2026");
-  const count2025 = item2025 ? ((item2025.inProgress || 0) + (item2025.completed || 0)) : 0;
-  const count2026 = item2026 ? ((item2026.inProgress || 0) + (item2026.completed || 0)) : 0;
+  const MONTH_MAP_LOWER: Record<string, number> = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, mei: 5, jun: 6, jul: 7, aug: 8, agu: 8, sep: 9, oct: 10, okt: 10, nov: 11, des: 12, dec: 12
+  };
+  const startMonthNum = startMonth ? (MONTH_MAP_LOWER[startMonth.toLowerCase()] ?? 1) : 1;
+  const endMonthNum = endMonth ? (MONTH_MAP_LOWER[endMonth.toLowerCase()] ?? 12) : 12;
+
+  const activeFilter = useMemo(() => {
+    return {
+      startMonth: startMonthNum,
+      endMonth: endMonthNum,
+      startYear: startYear || 2025,
+      endYear: endYear || 2026
+    };
+  }, [startMonthNum, endMonthNum, startYear, endYear]);
+
+  // Reactive filtering logic inside the YoY / Benchmark component
+  const processedData = useMemo(() => {
+    const datasetToUse = (window as any).rawMasterDataset || allProjects || filteredProjects || [];
+    if (!datasetToUse || datasetToUse.length === 0) return { projects2025: [], projects2026: [] };
+    
+    const { startMonth, endMonth, startYear, endYear } = activeFilter;
+    const filterStartDate = new Date(startYear, startMonth - 1, 1).getTime();
+    const filterEndDate = new Date(endYear, endMonth, 0, 23, 59, 59).getTime();
+
+    const validProjects = datasetToUse.filter((item: any) => {
+      const lastStatus = (item["Last Status"] || "").toLowerCase();
+      const milestone = (item["Milestone"] || "").toUpperCase();
+      
+      // STRICT EXCLUSION: Drop canceled projects
+      if (lastStatus.includes("cancel") || milestone === "CANCELED") return false;
+
+      // Cross-Year Lifecycle Logic
+      const pStart = parseProjectDate(item["Created time"] || item["Tanggal Input Timeline"]);
+      const pEndStr = item["Live (Realized in date)"] || item["Live (Realized in Date)"] || item["Realized Finish MG"];
+      const pEnd = pEndStr ? parseProjectDate(pEndStr) : null;
+
+      if (!pStart) return false;
+
+      const projectStartTime = pStart.getTime();
+      const projectEndTime = pEnd ? pEnd.getTime() : Infinity; // Infinity if still in progress
+
+      // Check if the project was active DURING the filtered time boundary
+      return projectStartTime <= filterEndDate && projectEndTime >= filterStartDate;
+    });
+
+    return {
+      // Categorize by the year they were initiated or primarily active
+      projects2025: validProjects.filter((p: any) => {
+        const d = parseProjectDate(p["Created time"] || p["Tanggal Input Timeline"]);
+        return d && d.getFullYear() === 2025;
+      }),
+      projects2026: validProjects.filter((p: any) => {
+        const d = parseProjectDate(p["Created time"] || p["Tanggal Input Timeline"]);
+        return d && d.getFullYear() === 2026;
+      })
+    };
+  }, [allProjects, filteredProjects, activeFilter]);
+
+  const calcMetricsForProjects = (projs: any[]) => {
+    const devSlaField = "DEV SLA";
+    const slaProj = projs.filter(p => p[devSlaField] === "Achieved" || p[devSlaField] === "Not Achieved");
+    const ach = slaProj.filter(p => p[devSlaField] === "Achieved").length;
+    const pct = slaProj.length > 0 ? Math.round((ach / slaProj.length) * 100) : 100;
+
+    const parseLateDays = (lateStr: any) => {
+      if (!lateStr) return 0;
+      const parsed = parseInt(String(lateStr).split(" ")[0], 10);
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const inProgress = projs.filter(item => {
+      const status = (item["Last Status"] || "").toLowerCase();
+      const milestone = (item["Milestone"] || "").toUpperCase();
+      return status !== "live" && milestone !== "CLOSED" && status !== "canceled" && milestone !== "CANCELED";
+    }).length;
+
+    const completed = projs.filter(item => {
+      const status = (item["Last Status"] || "").toLowerCase();
+      const milestone = (item["Milestone"] || "").toUpperCase();
+      return status === "live" || milestone === "CLOSED";
+    }).length;
+
+    const totalDelayDays = projs.reduce((acc, item) => acc + parseLateDays(item["(Dev) Late Days"] || item._lateDev), 0);
+
+    return { pct, inProgress, completed, totalDelayDays, count: projs.length };
+  };
+
+  const metrics2025 = useMemo(() => calcMetricsForProjects(processedData.projects2025), [processedData.projects2025]);
+  const metrics2026 = useMemo(() => calcMetricsForProjects(processedData.projects2026), [processedData.projects2026]);
+
+  const count2025 = metrics2025.inProgress + metrics2025.completed;
+  const count2026 = metrics2026.inProgress + metrics2026.completed;
+
+  const yoySlaOverridden = useMemo(() => [
+    { year: "2025", ...metrics2025, color: '#94A3B8' },
+    { year: "2026", ...metrics2026, color: '#2563EB' }
+  ], [metrics2025, metrics2026]);
 
   // Active status groups
   const activeTypes = ['Antrian', 'Dalam Proses', 'UAT', 'Monitoring', 'Hold', 'Change Request'];
@@ -679,18 +831,18 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
       const sitStatus = item["(SIT) Status"] ? item["(SIT) Status"].trim().toLowerCase() : "";
       const crStatus = item["(Change Request) Status"] ? item["(Change Request) Status"].trim().toLowerCase() : "";
 
-      // RULE A: STRICT EXCLUSION - If project is already Live, it is NO LONGER In Progress
-      if (lastStatus.includes("live")) {
+      // STRICT EXCLUSION: If project is already Live, Canceled, or on Hold - it is not In Progress
+      if (lastStatus.includes("live") || lastStatus.includes("cancel") || lastStatus.includes("hold")) {
         return false;
       }
 
-      // RULE B: INCLUSION - Capture active sub-stages
-      return (
-        fsdStatus === "on progress" || fsdStatus.includes("progress") ||
-        devStatus === "on progress" || devStatus.includes("progress") ||
-        sitStatus === "on progress" || sitStatus.includes("progress") ||
-        crStatus === "on progress" || lastStatus.includes("change request on progress")
-      );
+      // EXPANDED FSD INCLUSION: Catch active FSD pipeline stages even without "progress" in name
+      const isActiveFSD = fsdStatus !== "" && fsdStatus !== "done" && !fsdStatus.includes("not start");
+      const isActiveDev = devStatus === "on progress" || devStatus.includes("progress");
+      const isActiveSIT = sitStatus === "on progress" || sitStatus.includes("progress");
+      const isActiveCR = crStatus === "on progress" || lastStatus.includes("change request on progress");
+
+      return isActiveFSD || isActiveDev || isActiveSIT || isActiveCR;
     });
   }, [globalRawList, list]);
 
@@ -1539,7 +1691,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                   <div className="border-b border-dashed border-gray-200 w-full flex justify-between"><span>0% Base-Level</span></div>
                 </div>
 
-                {yoySla.filter(f => f.year === "2025" || f.year === "2026").map((item, idx) => (
+                {yoySlaOverridden.map((item, idx) => (
                   <div key={idx} className="flex flex-col items-center z-10 w-24">
                     <span className="text-[13px] font-mono font-extrabold text-gray-900 mb-2">{item.pct}%</span>
                     <div
@@ -1572,7 +1724,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           <div className="space-y-4">
             <h4 className="text-[11px] font-bold uppercase text-gray-400 tracking-wider font-display">Development Alignment Benchmarks</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {yoySla.filter(f => f.year === "2025" || f.year === "2026").map((item) => (
+              {yoySlaOverridden.map((item) => (
                 <div
                   key={item.year}
                   className={`p-4 rounded-2xl border ${
@@ -2601,7 +2753,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           pList = queueProjectsPool;
           modalSub = `Showing ${pList.length} projects in Queue state (Last Status exactly "On Queue")`;
         } else if (key === "progress") {
-          pList = cleanInProgressPool;
+          pList = [...cleanInProgressPool].sort((a, b) => getStagePriorityWeight(a) - getStagePriorityWeight(b));
           modalSub = `Showing ${pList.length} projects active in development cycle`;
         } else if (key === "uat") {
           pList = list.filter(p => {
@@ -2755,32 +2907,37 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-101 select-text">
-                            {holdByOwnerList.map((p, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50/55">
-                                <td className="py-2.5 px-3 font-mono font-bold text-gray-500 align-top">{p["Ticket"] || "—"}</td>
-                                <td className="py-2.5 px-3 font-bold text-gray-800 whitespace-normal break-words align-top" style={{ minWidth: "150px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
-                                <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[140px]" style={{ minWidth: "140px" }}>
-                                  {p["Owner Div"] || p["Owner Division"] || "-"}
-                                </td>
-                                <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[120px]" style={{ minWidth: "120px" }}>
-                                  {p["Owner Name"] || "-"}
-                                </td>
-                                <td className="py-2.5 px-3 text-gray-650 align-top">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
-                                <td className="py-2.5 px-3 align-top">
-                                  <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-purple-700 bg-purple-50/60 border-purple-100 font-sans">
-                                    {p["Last Status"] || "Hold"}
-                                  </span>
-                                </td>
-                                <td className="py-2.5 px-3 text-right align-top">
-                                  <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm ml-auto text-right">
-                                    {getDisplayDate(p)}
-                                  </div>
-                                </td>
-                                <td className="py-2.5 px-3 align-top">
-                                  <div className="max-h-[110px] overflow-y-auto whitespace-normal break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(getGlobalProgressUpdate(p)) }} />
-                                </td>
-                              </tr>
-                            ))}
+                            {holdByOwnerList.map((p, idx) => {
+                              const rawStatus = p["Last Status"] || "Hold";
+                              const dispDate = getDisplayDate(p) || "";
+
+                              return (
+                                <tr key={idx} className="hover:bg-gray-50/55">
+                                  <td className="py-2.5 px-3 font-mono font-bold text-gray-500 align-top">{p["Ticket"] || "—"}</td>
+                                  <td className="py-2.5 px-3 font-bold text-gray-800 whitespace-normal break-words align-top" style={{ minWidth: "150px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
+                                  <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[140px]" style={{ minWidth: "140px" }}>
+                                    {p["Owner Div"] || p["Owner Division"] || "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[120px]" style={{ minWidth: "120px" }}>
+                                    {p["Owner Name"] || "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-gray-650 align-top">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
+                                  <td className="py-2.5 px-3 align-top">
+                                    <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-purple-700 bg-purple-50/60 border-purple-100 font-sans">
+                                      {rawStatus}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right align-top">
+                                    <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm ml-auto text-right">
+                                      {getStandardizedRemark(dispDate)}
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-3 align-top">
+                                    <div className="max-h-[110px] overflow-y-auto whitespace-normal break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(getGlobalProgressUpdate(p)) }} />
+                                  </td>
+                                </tr>
+                              );
+                            })}
                             {holdByOwnerList.length === 0 && (
                               <tr>
                                 <td colSpan={8} className="py-6 text-center text-xs text-gray-400 italic">No Owner Hold projects found in current range</td>
@@ -2814,32 +2971,37 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-101 select-text">
-                            {holdByClientItList.map((p, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50/55">
-                                <td className="py-2.5 px-3 font-mono font-bold text-gray-500 align-top">{p["Ticket"] || "—"}</td>
-                                <td className="py-2.5 px-3 font-bold text-gray-800 whitespace-normal break-words align-top" style={{ minWidth: "150px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
-                                <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[140px]" style={{ minWidth: "140px" }}>
-                                  {p["Owner Div"] || p["Owner Division"] || "-"}
-                                </td>
-                                <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[120px]" style={{ minWidth: "120px" }}>
-                                  {p["Owner Name"] || "-"}
-                                </td>
-                                <td className="py-2.5 px-3 text-gray-650 align-top">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
-                                <td className="py-2.5 px-3 align-top">
-                                  <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-blue-700 bg-blue-50/60 border-blue-100 font-sans">
-                                    {p["Last Status"] || "Hold"}
-                                  </span>
-                                </td>
-                                <td className="py-2.5 px-3 text-right align-top">
-                                  <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm ml-auto text-right">
-                                    {getDisplayDate(p)}
-                                  </div>
-                                </td>
-                                <td className="py-2.5 px-3 align-top">
-                                  <div className="max-h-[110px] overflow-y-auto whitespace-normal break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(getGlobalProgressUpdate(p)) }} />
-                                </td>
-                              </tr>
-                            ))}
+                            {holdByClientItList.map((p, idx) => {
+                              const rawStatus = p["Last Status"] || "Hold";
+                              const dispDate = getDisplayDate(p) || "";
+
+                              return (
+                                <tr key={idx} className="hover:bg-gray-50/55">
+                                  <td className="py-2.5 px-3 font-mono font-bold text-gray-500 align-top">{p["Ticket"] || "—"}</td>
+                                  <td className="py-2.5 px-3 font-bold text-gray-800 whitespace-normal break-words align-top" style={{ minWidth: "150px" }} title={p["Project Name"]}>{p["Project Name"]}</td>
+                                  <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[140px]" style={{ minWidth: "140px" }}>
+                                    {p["Owner Div"] || p["Owner Division"] || "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-xs text-slate-600 whitespace-normal break-words align-top text-left min-w-[120px]" style={{ minWidth: "120px" }}>
+                                    {p["Owner Name"] || "-"}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-gray-650 align-top">{p["PIC Short Name"] || p["PIC Name"] || "—"}</td>
+                                  <td className="py-2.5 px-3 align-top">
+                                    <span className="inline-block text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded-md border text-blue-700 bg-blue-50/60 border-blue-100 font-sans">
+                                      {rawStatus}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right align-top">
+                                    <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm ml-auto text-right">
+                                      {getStandardizedRemark(dispDate)}
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-3 align-top">
+                                    <div className="max-h-[110px] overflow-y-auto whitespace-normal break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(getGlobalProgressUpdate(p)) }} />
+                                  </td>
+                                </tr>
+                              );
+                            })}
                             {holdByClientItList.length === 0 && (
                               <tr>
                                 <td colSpan={8} className="py-6 text-center text-xs text-gray-400 italic">No Client / VENDOR Hold projects found in current range</td>
@@ -2879,6 +3041,11 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                           const projectNameText = p["Project Name"] || "—";
                           const picShortText = p["PIC Short Name"] || p["PIC Name"] || "—";
 
+                          const rawStatus = p["Last Status"] || "";
+                          const dispDate = getDisplayDate(p) || "";
+                          const hasAlias = getStandardizedStatus(rawStatus, dispDate).toLowerCase() === "on development";
+                          const dateIsAlias = dispDate.toLowerCase().includes("pic input caldev cr");
+
                           return (
                             <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
                               <td className="py-3 px-3 font-mono font-bold text-gray-500 text-[11px] align-top">
@@ -2897,12 +3064,24 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                                 {picShortText}
                               </td>
                               <td className="py-3 px-3 align-top">
-                                <span className={`inline-block text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-full border ${stampColor} font-sans`}>
-                                  {p["Last Status"] || "Unknown"}
-                                </span>
+                                {hasAlias ? (
+                                  <span className="inline-block text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded text-[11px] font-semibold uppercase font-sans whitespace-nowrap">
+                                    On Development
+                                  </span>
+                                ) : (
+                                  <span className={`inline-block text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-full border ${stampColor} font-sans`}>
+                                    {rawStatus || "Unknown"}
+                                  </span>
+                                )}
                               </td>
                               <td className="py-3 px-3 text-xs font-semibold text-slate-600 break-words leading-relaxed text-left min-w-[160px] whitespace-pre-line align-top">
-                                {formatUATBatchText(getDisplayDate(p))}
+                                {dateIsAlias ? (
+                                  <span className="inline-block text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded text-[11px] font-semibold uppercase font-sans whitespace-nowrap">
+                                    On Development
+                                  </span>
+                                ) : (
+                                  formatUATBatchText(dispDate)
+                                )}
                               </td>
                               <td className="py-3 px-3 align-top">
                                 <div className="max-h-[110px] overflow-y-auto whitespace-normal break-words text-[11px] leading-relaxed text-slate-600 pr-2 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm" dangerouslySetInnerHTML={{ __html: renderChronologicalProgress(getGlobalProgressUpdate(p)) }} />
@@ -2953,6 +3132,30 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                           const projectNameText = isProgressCard ? (p["Project Name"] || p["Nama Project"] || "-") : p["Project Name"];
                           const picShortText = isProgressCard ? (p["PIC Short Name"] || p["PIC Project"] || "-") : (p["PIC Short Name"] || p["PIC Name"] || "—");
 
+                          const rawStatus = p["Last Status"] || "";
+                          let dateNotesText = "";
+                          if (isProgressCard) {
+                            dateNotesText = getGlobalProjectDate(p) || "";
+                          } else if (key === "queue") {
+                            const ticketId = p["Ticket"] ? String(p["Ticket"]).trim() : "";
+                            if (ticketId === "25020019") {
+                              dateNotesText = "FSD udah dikerjakan sekitar 80%, tapi ada Revisi FPS dan plan Finish Revisi FPS pada 10 Juli 2026";
+                            } else if (ticketId === "25050045") {
+                              dateNotesText = "Sedang di-email terkait relevansi project pada tanggal 19 Juni 2026 oleh Bimo Adi Nurzaman (PT. Advantage SCM)";
+                            } else if (ticketId === "25100107") {
+                              dateNotesText = "Revisi FPS by Owner (Plan Finish Revisi FPS belum dapat dari owner, sudah di-email oleh IT)";
+                            } else if (ticketId === "25100103") {
+                              dateNotesText = "Plan Finish Approval pada W4 Juni 2026";
+                            } else {
+                              dateNotesText = getDisplayDate(p) || "";
+                            }
+                          } else {
+                            dateNotesText = getDisplayDate(p) || "";
+                          }
+
+                          const hasAlias = getStandardizedStatus(rawStatus, dateNotesText).toLowerCase() === "on development";
+                          const dateIsAlias = dateNotesText.toLowerCase().includes("pic input caldev cr");
+
                           return (
                             <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
                               <td className="py-3 px-3 font-mono font-bold text-gray-500 text-[11px] align-top">
@@ -2971,35 +3174,30 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                                 {picShortText}
                               </td>
                               <td className="py-3 px-3 align-top">
-                                <span className={`inline-block text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-full border ${stampColor} font-sans`}>
-                                  {p["Last Status"] || "Unknown"}
-                                </span>
+                                {hasAlias ? (
+                                  <span className="inline-block text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded text-[11px] font-semibold uppercase font-sans whitespace-nowrap">
+                                    On Development
+                                  </span>
+                                ) : (
+                                  <span className={`inline-block text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-full border ${stampColor} font-sans`}>
+                                    {rawStatus || "Unknown"}
+                                  </span>
+                                )}
                               </td>
                               <td className={isProgressCard ? "py-3 px-3 align-top text-left" : key === "queue" ? "py-3 px-3 whitespace-normal break-words text-xs font-medium text-slate-600 max-w-[280px] align-top text-left" : "py-3 px-3 text-right align-top"}>
-                                {isProgressCard ? (
+                                {dateIsAlias ? (
+                                  <span className="inline-block text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded text-[11px] font-semibold uppercase font-sans whitespace-nowrap">
+                                    On Development
+                                  </span>
+                                ) : isProgressCard ? (
                                   <div className="whitespace-pre-line break-words text-xs leading-relaxed max-w-sm max-h-[110px] overflow-y-auto pr-1 text-left">
-                                    {getGlobalProjectDate(p)}
+                                    {dateNotesText}
                                   </div>
                                 ) : key === "queue" ? (
-                                  (() => {
-                                    const ticketId = p["Ticket"] ? String(p["Ticket"]).trim() : "";
-                                    if (ticketId === "25020019") {
-                                      return "FSD udah dikerjakan sekitar 80%, tapi ada Revisi FPS dan plan Finish Revisi FPS pada 10 Juli 2026";
-                                    }
-                                    if (ticketId === "25050045") {
-                                      return "Sedang di-email terkait relevansi project pada tanggal 19 Juni 2026 oleh Bimo Adi Nurzaman (PT. Advantage SCM)";
-                                    }
-                                    if (ticketId === "25100107") {
-                                      return "Revisi FPS by Owner (Plan Finish Revisi FPS belum dapat dari owner, sudah di-email oleh IT)";
-                                    }
-                                    if (ticketId === "25100103") {
-                                      return "Plan Finish Approval pada W4 Juni 2026";
-                                    }
-                                    return getDisplayDate(p);
-                                  })()
+                                  dateNotesText
                                 ) : (
                                   <div className="max-h-[96px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-slate-600 font-medium pr-1.5 scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 max-w-sm ml-auto text-right">
-                                    {getDisplayDate(p)}
+                                    {dateNotesText}
                                   </div>
                                 )}
                               </td>
@@ -3410,23 +3608,16 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
           return index !== undefined ? index : -1;
         };
 
-        const startIdx = startMonth ? (MONTH_MAP_LOWER[startMonth.toLowerCase()] ?? 0) : 0;
-        const endIdx = endMonth ? (MONTH_MAP_LOWER[endMonth.toLowerCase()] ?? 11) : 11;
-
-        const masterAll = allProjects || list;
-
-        const projs2025 = masterAll.filter(p => {
-          const is2025 = getProjectIntakeYear(p) === "2025";
-          if (!is2025) return false;
-          const mIdx = getProjMonthIdx(p);
-          return mIdx >= startIdx && mIdx <= endIdx;
+        const projs2025 = [...processedData.projects2025].sort((a, b) => {
+          const dA = parseProjectDate(a["Created time"] || a["Tanggal Input Timeline"]);
+          const dB = parseProjectDate(b["Created time"] || b["Tanggal Input Timeline"]);
+          return (dB?.getTime() ?? 0) - (dA?.getTime() ?? 0);
         });
 
-        const projs2026 = masterAll.filter(p => {
-          const is2026 = getProjectIntakeYear(p) === "2026";
-          if (!is2026) return false;
-          const mIdx = getProjMonthIdx(p);
-          return mIdx >= startIdx && mIdx <= endIdx;
+        const projs2026 = [...processedData.projects2026].sort((a, b) => {
+          const dA = parseProjectDate(a["Created time"] || a["Tanggal Input Timeline"]);
+          const dB = parseProjectDate(b["Created time"] || b["Tanggal Input Timeline"]);
+          return (dB?.getTime() ?? 0) - (dA?.getTime() ?? 0);
         });
 
         // Helper to check if dev is completed
