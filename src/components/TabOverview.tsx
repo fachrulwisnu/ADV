@@ -875,8 +875,17 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
     }
 
     let scopeProjects = filteredData.filter(d => {
-      const status = d["Last Status"] ? d["Last Status"].trim().toLowerCase() : "";
-      return ["uat on progress", "live", "live monitoring"].includes(status);
+      const cd = d.cleansed_data || d;
+      const status = (cd["Last Status"] || d["Last Status"] || cd["Status"] || d["Status"] || "").toString().trim().toLowerCase();
+      const uatStatus = (cd["(UAT) Status"] || d["(UAT) Status"] || "").toString().toLowerCase();
+      const monStatus = (cd["(Mon After Live) Status"] || d["(Mon After Live) Status"] || "").toString().toLowerCase();
+      const liveStatus = (cd["(Live) Status"] || d["(Live) Status"] || "").toString().toLowerCase();
+      
+      const isUat = status.includes("uat") || uatStatus === "in progress" || uatStatus === "on progress";
+      const isMonitor = status.includes("monitor") || status.includes("monitoring") || monStatus === "in progress" || monStatus === "on progress";
+      const isLive = status.includes("live") || liveStatus === "in progress" || liveStatus === "on progress" || liveStatus === "live" || status === "live";
+
+      return isUat || isMonitor || isLive;
     });
 
     let withFeedback = scopeProjects.filter(d => {
@@ -901,19 +910,21 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
 
   // 2. COUNTERS RE-LINKED TO THE DYNAMIC FILTERED DATASET WITH 2026/DATES ADJUSTMENTS
   const evaluatedProjs = useMemo(() => {
-    return getActiveSlaPool(list).filter((p) =>
-      ["FSD SLA", "DEV SLA", "SIT SLA", "UAT SLA", "Live SLA"].some(
-        (f) => p[f] === "Achieved" || p[f] === "Not Achieved"
-      )
-    );
+    return getActiveSlaPool(list).filter((p) => {
+      const cd = p.cleansed_data || p;
+      return ["FSD SLA", "DEV SLA", "SIT SLA", "UAT SLA", "Live SLA"].some((f) => {
+        const val = p[f] || cd[f];
+        return val === "Achieved" || val === "Not Achieved";
+      });
+    });
   }, [list]);
 
   const goLiveProjs = useMemo(() => {
-    return list.filter(
-      (p) =>
-        statusGroupOf(p["Last Status"]) === "Live" ||
-        (p["Last Status"] && p["Last Status"].toLowerCase().includes("live"))
-    );
+    return list.filter((p) => {
+      const cd = p.cleansed_data || {};
+      const liveStatus = cd['(Live) Status'] ?? p['(Live) Status'];
+      return liveStatus != null && liveStatus.toString().trim() !== '';
+    });
   }, [list]);
 
   // SLA Total 2026: count projects with Year 2026 and at least one Active / Achieved SLA
