@@ -2,15 +2,15 @@ import { RawProject, SanitizedProject, DashboardDataset, KpiItem, MilestoneItem 
 import { getProjectIntakeYear } from "./utils";
 
 export function statusGroupOf(status: string | null): string {
-  const s = (status || '').trim().toLowerCase();
-  if (s.includes('queue')) return 'Antrian';
-  if (s.includes('progress') || s === 'fps' || s === 'fsd' || s === 'dev' || s === 'sit') return 'Dalam Proses';
-  if (s.includes('uat')) return 'UAT';
-  if (s.includes('monitoring') || s.includes('monitor')) return 'Monitoring';
-  if (s.includes('hold')) return 'Hold';
-  if (s.includes('change request')) return 'Change Request';
-  if (s.includes('canceled') || s.includes('cancel')) return 'Canceled';
-  if (s.includes('live')) return 'Live';
+  const s = (status || '').trim();
+  if (/Queue/i.test(s)) return 'Antrian';
+  if (/^(FPS|FSD|Dev|SIT)$/i.test(s) || /Progress/i.test(s)) return 'Dalam Proses';
+  if (/UAT/i.test(s)) return 'UAT';
+  if (/Monitoring/i.test(s)) return 'Monitoring';
+  if (/Hold/i.test(s)) return 'Hold';
+  if (/Change Request/i.test(s)) return 'Change Request';
+  if (/Canceled/i.test(s)) return 'Canceled';
+  if (/Live/i.test(s)) return 'Live';
   return 'Lainnya';
 }
 
@@ -63,13 +63,7 @@ export function sanitizeProjects(data: RawProject[]): SanitizedProject[] {
       _achLive:    parsePercent(cd["Achieved Live"] ?? d["Achieved Live"]),
       _achSIT:     parsePercent(cd["Achieved SIT %"] ?? d["Achieved SIT %"]),
       _achUAT:     parsePercent(cd["Achieved UAT %"] ?? d["Achieved UAT %"]),
-      _feedback:   (function() {
-        const val = cd["User Satisfaction"] ?? d["User Satisfaction"] ?? cd["Rata-rata Nilai Feedback User : "] ?? d["Rata-rata Nilai Feedback User : "] ?? cd["Rata-rata Nilai Feedback User New :"] ?? d["Rata-rata Nilai Feedback User New :"] ?? cd["User Satisfaction Rate"] ?? d["User Satisfaction Rate"];
-        if (val == null) return null;
-        const num = Number(val);
-        if (isNaN(num) || num <= 0) return null;
-        return num > 5 ? (num / 20) : num;
-      })()
+      _feedback:   ((cd["Rata-rata Nilai Feedback User : "] ?? d["Rata-rata Nilai Feedback User : "]) && Number(cd["Rata-rata Nilai Feedback User : "] ?? d["Rata-rata Nilai Feedback User : "]) > 0) ? Number(cd["Rata-rata Nilai Feedback User : "] ?? d["Rata-rata Nilai Feedback User : "]) : null
     };
   });
 }
@@ -123,65 +117,20 @@ export function computeDashboardMetrics(data: SanitizedProject[], rawData?: RawP
     if (m) reportDate = m[1];
   }
 
-  const getCleanStatus = (p: any): string => {
-    const cd = p.cleansed_data || p;
-    return (cd["Last Status"] || p["Last Status"] || cd["Status"] || p["Status"] || "").toString().trim().toLowerCase();
-  };
-
   // Active status groups are everything except Canceled and Live
   const activeTypes = ['Antrian', 'Dalam Proses', 'UAT', 'Monitoring', 'Hold', 'Change Request'];
-  const activeProjects = data.filter(p => {
-    const status = getCleanStatus(p);
-    return activeTypes.includes(statusGroupOf(status));
-  });
+  const activeProjects = data.filter(p => activeTypes.includes(statusGroupOf(p["Last Status"])));
 
   const actualRawData = rawData || data;
   const queueStatuses = ["On Queue", "Dev On Queue", "UAT On Queue", "Live On Queue"];
-  const queueCount = actualRawData.filter(d => {
-    const status = getCleanStatus(d);
-    return status.includes("queue") || queueStatuses.some(qs => qs.toLowerCase() === status);
-  }).length;
+  const queueCount = actualRawData.filter(d => d["Last Status"] && queueStatuses.includes(d["Last Status"])).length;
+  const progressCount = data.filter(p => statusGroupOf(p["Last Status"]) === 'Dalam Proses').length;
+  const uatCount = data.filter(d => d["Last Status"] && (d["Last Status"].toLowerCase().includes("uat on queue") || d["Last Status"].toLowerCase().includes("uat on progress"))).length;
+  const monitoringCount = data.filter(p => statusGroupOf(p["Last Status"]) === 'Monitoring').length;
+  const holdCount = data.filter(p => statusGroupOf(p["Last Status"]) === 'Hold').length;
 
-  const progressCount = data.filter(p => {
-    const status = getCleanStatus(p);
-    const cd = p.cleansed_data || p;
-    const fsdStatus = (cd["(FSD) Status"] || p["(FSD) Status"] || "").toString().toLowerCase();
-    const devStatus = (cd["(Dev) Status"] || p["(Dev) Status"] || "").toString().toLowerCase();
-    const sitStatus = (cd["(SIT) Status"] || p["(SIT) Status"] || "").toString().toLowerCase();
-    
-    return statusGroupOf(status) === 'Dalam Proses' ||
-           fsdStatus === "in progress" || fsdStatus === "on progress" ||
-           devStatus === "in progress" || devStatus === "on progress" ||
-           sitStatus === "in progress" || sitStatus === "on progress";
-  }).length;
-
-  const uatCount = data.filter(p => {
-    const lastStatus = ((p as any).last_status || p["Last Status"] || "").toString().toLowerCase();
-    const cd = p.cleansed_data || {};
-    const uatStatus = cd['(UAT) Status'] ?? p['(UAT) Status'];
-    return lastStatus.includes('uat') || (uatStatus != null && uatStatus.toString().trim() !== "");
-  }).length;
-
-  const monitoringCount = data.filter(p => {
-    const cd = p.cleansed_data || {};
-    const monStatus = cd['(Mon After Live) Status'] ?? p['(Mon After Live) Status'];
-    return monStatus != null && monStatus.toString().trim() !== "";
-  }).length;
-
-  const holdCount = data.filter(p => {
-    const status = getCleanStatus(p);
-    return statusGroupOf(status) === 'Hold';
-  }).length;
-
-  const holdByOwner = data.filter(p => {
-    const status = getCleanStatus(p);
-    return status === "hold by owner";
-  }).length;
-
-  const holdByVendor = data.filter(p => {
-    const status = getCleanStatus(p);
-    return status === "hold by client/vendor" || status === "hold by it" || status.includes("client/vendor") || status.includes("hold by client") || status.includes("hold by vendor") || status.includes("hold by it");
-  }).length;
+  const holdByOwner = data.filter(p => p["Last Status"] === "Hold By Owner").length;
+  const holdByVendor = data.filter(p => ["Hold By Client/Vendor", "Hold By IT"].includes(p["Last Status"])).length;
 
   const activeTotalCount = activeProjects.length;
 
@@ -297,12 +246,7 @@ export function computeDashboardMetrics(data: SanitizedProject[], rawData?: RawP
 
   // Go-live list (Completed projects, sorted by Live realized date)
   const goLiveList = data
-    .filter(p => {
-      const cd = p.cleansed_data || {};
-      const liveStatus = cd['(Live) Status'] ?? p['(Live) Status'];
-      const status = (cd["Last Status"] || p["Last Status"] || "").toString().toLowerCase();
-      return statusGroupOf(status) === 'Live' || status.includes("live") || (liveStatus != null && liveStatus.toString().trim() !== "");
-    })
+    .filter(p => statusGroupOf(p["Last Status"]) === 'Live' || p["Last Status"] === "Live On Monitoring")
     .map(p => p["Project Name"])
     .slice(0, 9);
 

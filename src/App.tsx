@@ -79,10 +79,8 @@ export default function App() {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const fetchDataFromSupabase = async (isSilent = false) => {
-    if (!isSilent && rawProjects.length === 0) {
-      setIsLoading(true);
-    }
+  const fetchDataFromSupabase = async () => {
+    setIsLoading(true);
     try {
       const supabase = getSupabaseClientClientSide();
       if (!supabase) {
@@ -91,7 +89,7 @@ export default function App() {
       
       const { data, error } = await supabase
         .from("notion_projects")
-        .select("notion_page_id, ticket, project_name, owner_division, pic_name, last_status, milestone, cleansed_data, last_synced");
+        .select("notion_page_id, ticket, project_name, owner_division, pic_name, last_status, milestone, cleansed_data");
 
       if (error) {
         throw error;
@@ -107,8 +105,6 @@ export default function App() {
           "Milestone": dbRow.milestone,
           "cleansed_data": dbRow.cleansed_data,
           "notion_page_id": dbRow.notion_page_id,
-          "last_synced": dbRow.last_synced,
-          "Last Synced": dbRow.last_synced,
           ...(dbRow.cleansed_data || {})
         };
       });
@@ -127,13 +123,11 @@ export default function App() {
         triggerAlert(`Gagal memuat data: ${err.message || err}`);
       }
 
-      // Fallback to local default dataset only if we do not already have data
-      if (rawProjects.length === 0) {
-        const sanitizedDefault = sanitizeAndLoadMasterJSON(DEFAULT_RAW_PROJECTS);
-        window.rawMasterDataset = sanitizedDefault;
-        setRawProjects(sanitizedDefault);
-        setIsCustomLoaded(false);
-      }
+      // Fallback to local default dataset
+      const sanitizedDefault = sanitizeAndLoadMasterJSON(DEFAULT_RAW_PROJECTS);
+      window.rawMasterDataset = sanitizedDefault;
+      setRawProjects(sanitizedDefault);
+      setIsCustomLoaded(false);
     } finally {
       setIsLoading(false);
     }
@@ -162,28 +156,15 @@ export default function App() {
       }
 
       const result = await response.json();
-      
-      if (result.changesDetected === 0) {
-        triggerAlert("Sync Sukses! There's no updated data from Notion.");
-      } else if (result.changesDetected > 0) {
-        const updatedProjs = result.updatedProjects || [];
-        let listStr = "";
-        if (updatedProjs.length > 0) {
-          const firstThree = updatedProjs.slice(0, 3);
-          listStr = " " + firstThree.join(", ");
-          if (updatedProjs.length > 3) {
-            listStr += ", ...";
-          }
-        }
-        triggerAlert(`Sync Sukses! ${result.changesDetected} data updated:${listStr}`);
-      } else {
-        triggerAlert("Sync Sukses!");
-      }
-
-      // Fetch fresh data in background (silently)
-      await fetchDataFromSupabase(true);
+      const synced = await fetchDataFromSupabase();
       setSyncTrigger((prev) => prev + 1);
 
+      if (synced) {
+        const count = result.count !== undefined ? result.count : synced.length;
+        triggerAlert(`Success! ${count} records synced.`);
+      } else {
+        triggerAlert("Successfully triggered sync, but database holds no records.");
+      }
     } catch (err: any) {
       console.error("Sync failed:", err);
       triggerAlert(`Sync failed: ${err.message || err}`);
@@ -193,28 +174,7 @@ export default function App() {
   };
 
   React.useEffect(() => {
-    // Initial fetch
     fetchDataFromSupabase();
-
-    // Set up Supabase Realtime subscription
-    const supabase = getSupabaseClientClientSide();
-    if (supabase) {
-      const channel = supabase
-        .channel("realtime-notion-projects-changes")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "notion_projects" },
-          (payload) => {
-            console.log("Supabase Realtime update received:", payload);
-            fetchDataFromSupabase(true); // Silent, background refetch
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
   }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -726,7 +686,7 @@ export default function App() {
               }`}
             >
               <Icon name="refresh-cw" className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-              {isSyncing ? "Syncing..." : "Sync with Notion"}
+              {isSyncing ? "Syncing... Please wait" : "Sync with Notion"}
             </button>
           </div>
         </header>
@@ -752,7 +712,7 @@ export default function App() {
 
         {/* Content Screens Container Port */}
         <div className="flex-1 p-6">
-          {isLoading && rawProjects.length === 0 ? (
+          {isLoading ? (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-450 space-y-4">
               <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
               <p className="text-sm font-semibold tracking-tight text-gray-500 animate-pulse">

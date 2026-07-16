@@ -205,17 +205,7 @@ export function calculateProjectAverageScore(item: any): number | null {
   });
 
   // Return null if no feedback has been submitted yet for the row
-  if (validKeysCount === 0) {
-    const d = item || {};
-    const fallbackVal = cd?.["User Satisfaction"] ?? d?.["User Satisfaction"] ?? cd?.["Rata-rata Nilai Feedback User : "] ?? d?.["Rata-rata Nilai Feedback User : "] ?? cd?.["Rata-rata Nilai Feedback User New :"] ?? d?.["Rata-rata Nilai Feedback User New :"] ?? cd?.["User Satisfaction Rate"] ?? d?.["User Satisfaction Rate"];
-    if (fallbackVal != null) {
-      const score = parseFloat(fallbackVal);
-      if (!isNaN(score) && score > 0) {
-        return Math.min(5.00, score > 5 ? (score / 20) : score);
-      }
-    }
-    return null;
-  }
+  if (validKeysCount === 0) return null;
 
   // Compute the absolute row average (Capped strictly at 5.00)
   return Math.min(5.00, totalScore / validKeysCount);
