@@ -932,7 +932,7 @@ export function TabSla({
                     {modalList.map((p, idx) => {
                       const isAchieved = p["DEV SLA"] === "Achieved";
                       return (
-                        <tr key={idx} className="hover:bg-gray-55/20 transition-colors">
+                        <tr key={p.notion_page_id || idx} className="hover:bg-gray-55/20 transition-colors">
                           <td className="py-3 px-3 font-mono font-bold text-gray-450">{idx + 1}</td>
                           <td className="py-3 px-3 font-mono font-bold text-gray-500 whitespace-nowrap">
                             {p["Ticket"] || p.ticket || "—"}

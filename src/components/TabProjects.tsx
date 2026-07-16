@@ -334,7 +334,7 @@ export function TabProjects({ projects }: TabProjectsProps) {
                 const totalDelay = (p._lateFSD || 0) + (p._lateDev || 0) + (p._lateSIT || 0) + (p._lateUAT || 0) + (p._lateLive || 0);
                 
                 return (
-                  <tr key={idx} className="hover:bg-gray-50/15 transition-all text-gray-700">
+                  <tr key={p.notion_page_id || p["Ticket"] || idx} className="hover:bg-gray-50/15 transition-all text-gray-700">
                     {/* No */}
                     <td className="py-3.5 px-4 font-mono font-bold text-gray-400 text-center">{globalIndex}</td>
                     

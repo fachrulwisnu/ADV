@@ -1826,7 +1826,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                         const lateDays = p._lateUAT || 0;
                         const progressNotes = p["(UAT) Progress Updated"] || "—";
                         return (
-                          <tr key={idx} className="hover:bg-gray-50/40 transition-colors">
+                          <tr key={p.notion_page_id || idx} className="hover:bg-gray-50/40 transition-colors">
                             <td className="py-3 px-4 font-sans align-top whitespace-normal break-words">
                               <p className="font-bold text-gray-900 text-xs whitespace-normal break-words">{p["Project Name"] || "—"}</p>
                               <span className="font-mono text-[10px] text-gray-400 mt-1 block whitespace-normal break-words">{p["Ticket"] || "—"}</span>
@@ -1990,7 +1990,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                       const comments = getFeedbackComments(p);
                       const avgScore = calculateProjectAverageScore(p);
                       return (
-                        <tr key={idx} className="hover:bg-gray-50/[15] transition-colors">
+                        <tr key={p.notion_page_id || idx} className="hover:bg-gray-50/[15] transition-colors">
                           <td className="py-4 px-4 font-sans align-top">
                             <p className="font-bold text-gray-800 text-xs">{p["Project Name"]}</p>
                             <span className="font-mono text-[10px] text-gray-400 mt-1 block">{p["Ticket"] || "—"}</span>
@@ -2266,7 +2266,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
 
                         if (isGoLive) {
                           return (
-                            <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
+                            <tr key={p.notion_page_id || idx} className="hover:bg-gray-50/10 transition-colors">
                               <td className="py-3 px-4 font-mono font-bold text-gray-500 text-[11px] align-top whitespace-normal">
                                 {p["Ticket"] || "—"}
                               </td>
@@ -2306,7 +2306,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                         if (isAttention) {
                           const triggerInfo = getAttentionTrigger(p);
                           return (
-                            <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
+                            <tr key={p.notion_page_id || idx} className="hover:bg-gray-50/10 transition-colors">
                               <td className="py-3 px-4 font-mono font-bold text-gray-500 text-[11px] align-top whitespace-normal">
                                 {p["Ticket"] || "—"}
                               </td>
@@ -2332,7 +2332,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
 
                         // Standard SLA Evaluated, SLA Accomplished, or general contributors modal
                         return (
-                          <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
+                          <tr key={p.notion_page_id || idx} className="hover:bg-gray-50/10 transition-colors">
                             <td className="py-3 px-4 font-mono font-bold text-gray-500 text-[11px] align-top whitespace-normal">
                               {p["Ticket"] || "—"}
                             </td>
@@ -3157,7 +3157,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                           const dateIsAlias = dateNotesText.toLowerCase().includes("pic input caldev cr");
 
                           return (
-                            <tr key={idx} className="hover:bg-gray-50/10 transition-colors">
+                            <tr key={p.notion_page_id || idx} className="hover:bg-gray-50/10 transition-colors">
                               <td className="py-3 px-3 font-mono font-bold text-gray-500 text-[11px] align-top">
                                 {ticketText}
                               </td>
@@ -3361,7 +3361,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                           }
 
                           return (
-                            <tr key={idx} className="hover:bg-rose-50/20 transition-colors">
+                            <tr key={p.notion_page_id || idx} className="hover:bg-rose-50/20 transition-colors">
                               <td className="py-2.5 px-3 font-mono font-bold text-gray-500 text-left whitespace-normal break-words">{p["Ticket"] || "—"}</td>
                               <td className="py-2.5 px-3 font-bold text-gray-800 whitespace-normal break-words leading-relaxed">{p["Project Name"]}</td>
                               <td className="py-2.5 px-3 text-gray-700 font-medium whitespace-normal break-words leading-relaxed">{p["Owner Name"] || "—"}</td>
@@ -3466,7 +3466,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                           const dateVal = getProjectDisplayDate(p);
 
                           return (
-                            <tr key={idx} className="hover:bg-emerald-50/10 transition-colors">
+                            <tr key={p.notion_page_id || idx} className="hover:bg-emerald-50/10 transition-colors">
                               <td className="py-2.5 px-4 font-mono font-bold text-gray-500 text-left whitespace-normal break-words">{p["Ticket"] || "—"}</td>
                               <td className="py-2.5 px-4 font-semibold text-gray-800 whitespace-normal break-words leading-relaxed">{p["Project Name"]}</td>
                               <td className="py-2.5 px-4 text-gray-700 font-medium whitespace-normal break-words leading-relaxed">{p["Owner Name"] || "—"}</td>
@@ -3535,7 +3535,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                           {canceledStageProjectsList.map((p, idx) => {
                             const reasonText = getPoliteCancellationReason(p);
                             return (
-                              <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                              <tr key={p.notion_page_id || idx} className="hover:bg-slate-50/40 transition-colors">
                                 <td className="py-2.5 px-4 font-mono font-bold text-gray-500 text-left whitespace-normal break-words">{p["Ticket"] || "—"}</td>
                                 <td className="py-2.5 px-4 font-semibold text-gray-800 whitespace-normal break-words leading-relaxed">{p["Project Name"]}</td>
                                 <td className="py-2.5 px-4 whitespace-normal break-words leading-relaxed">
@@ -3714,7 +3714,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                       </thead>
                       <tbody className="divide-y divide-gray-100 select-text block">
                         {projs2025.map((p, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50/50 grid grid-cols-[80px,180px,60px,100px,60px,minmax(200px,1fr)] items-start py-2.5">
+                          <tr key={p.notion_page_id || idx} className="hover:bg-gray-50/50 grid grid-cols-[80px,180px,60px,100px,60px,minmax(200px,1fr)] items-start py-2.5">
                             <td className="px-3 font-mono text-[10.5px] text-gray-500 align-top">
                               {(p._year || p["Year"] || "2025")} / {(p._period || p["Period"] || "—")}
                             </td>
@@ -3774,7 +3774,7 @@ export function TabOverview({ dataset, onNavigateToTab, filteredProjects, allPro
                       </thead>
                       <tbody className="divide-y divide-gray-101 select-text block">
                         {projs2026.map((p, idx) => (
-                          <tr key={idx} className="hover:bg-amber-50/[0.04] grid grid-cols-[80px,180px,60px,100px,60px,minmax(200px,1fr)] items-start py-2.5">
+                          <tr key={p.notion_page_id || idx} className="hover:bg-amber-50/[0.04] grid grid-cols-[80px,180px,60px,100px,60px,minmax(200px,1fr)] items-start py-2.5">
                             <td className="px-3 font-mono text-[10.5px] text-gray-500 align-top">
                               {(p._year || p["Year"] || "2026")} / {(p._period || p["Period"] || "—")}
                             </td>

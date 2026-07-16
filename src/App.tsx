@@ -79,8 +79,10 @@ export default function App() {
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const fetchDataFromSupabase = async () => {
-    setIsLoading(true);
+  const fetchDataFromSupabase = async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+    }
     try {
       const supabase = getSupabaseClientClientSide();
       if (!supabase) {
@@ -89,7 +91,7 @@ export default function App() {
       
       const { data, error } = await supabase
         .from("notion_projects")
-        .select("notion_page_id, ticket, project_name, owner_division, pic_name, last_status, milestone, cleansed_data");
+        .select("notion_page_id, ticket, project_name, owner_division, pic_name, last_status, milestone, cleansed_data, last_synced");
 
       if (error) {
         throw error;
@@ -105,6 +107,7 @@ export default function App() {
           "Milestone": dbRow.milestone,
           "cleansed_data": dbRow.cleansed_data,
           "notion_page_id": dbRow.notion_page_id,
+          "last_synced": dbRow.last_synced,
           ...(dbRow.cleansed_data || {})
         };
       });
@@ -155,16 +158,11 @@ export default function App() {
         throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
       }
 
-      const result = await response.json();
-      const synced = await fetchDataFromSupabase();
+      await response.json();
+      await fetchDataFromSupabase(true);
       setSyncTrigger((prev) => prev + 1);
 
-      if (synced) {
-        const count = result.count !== undefined ? result.count : synced.length;
-        triggerAlert(`Success! ${count} records synced.`);
-      } else {
-        triggerAlert("Successfully triggered sync, but database holds no records.");
-      }
+      triggerAlert("Sync Sukses! Data berhasil diperbarui.");
     } catch (err: any) {
       console.error("Sync failed:", err);
       triggerAlert(`Sync failed: ${err.message || err}`);
@@ -180,10 +178,10 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ---- Period Filter Date Range States ----
-  const [startMonth, setStartMonth] = useState<string>("Jan");
-  const [startYear, setStartYear] = useState<number>(2024);
-  const [endMonth, setEndMonth] = useState<string>("Dec");
-  const [endYear, setEndYear] = useState<number>(2026);
+  const [startMonth, setStartMonth] = useState<string>("");
+  const [startYear, setStartYear] = useState<number | undefined>(undefined);
+  const [endMonth, setEndMonth] = useState<string>("");
+  const [endYear, setEndYear] = useState<number | undefined>(undefined);
 
   // Helper arrays for date validation
   const MONTH_NAMES = useMemo(() => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], []);
@@ -192,9 +190,10 @@ export default function App() {
     Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
   }), []);
 
-  const getPeriodScoreIdx = (month: string, year: number): number => {
+  const getPeriodScoreIdx = (month: string, year: number | undefined): number => {
     const mIdx = MONTH_INDEX_MAP[month] ?? 0;
-    return (year * 12) + mIdx;
+    const yVal = year ?? 0;
+    return (yVal * 12) + mIdx;
   };
 
   const handleStartMonthChange = (val: string) => {
@@ -203,7 +202,9 @@ export default function App() {
     const scoreEnd = getPeriodScoreIdx(endMonth, endYear);
     if (scoreStart > scoreEnd) {
       setEndMonth(val);
-      setEndYear(startYear);
+      if (startYear !== undefined) {
+        setEndYear(startYear);
+      }
     }
   };
 
@@ -235,7 +236,9 @@ export default function App() {
     const scoreEnd = getPeriodScoreIdx(targetMonth, endYear);
     if (scoreStart > scoreEnd) {
       setEndMonth(startMonth);
-      setEndYear(startYear);
+      if (startYear !== undefined) {
+        setEndYear(startYear);
+      }
     }
   };
 
@@ -260,7 +263,9 @@ export default function App() {
     const scoreEnd = getPeriodScoreIdx(targetMonth, targetYear);
     if (scoreStart > scoreEnd) {
       setEndMonth(startMonth);
-      setEndYear(startYear);
+      if (startYear !== undefined) {
+        setEndYear(startYear);
+      }
     }
   };
 
@@ -354,13 +359,14 @@ export default function App() {
       return (year * 12) + monthIndex;
     };
 
-    const getComboScore = (month: string, year: number): number => {
+    const getComboScore = (month: string, year: number | undefined): number => {
       const mIndex = MONTH_MAP[month.toLowerCase()] ?? 0;
-      return (year * 12) + mIndex;
+      const yVal = year ?? 0;
+      return (yVal * 12) + mIndex;
     };
 
-    const scoreStart = getComboScore(startMonth, startYear);
-    const scoreEnd = getComboScore(endMonth, endYear);
+    const scoreStart = (startMonth && startYear !== undefined) ? getComboScore(startMonth, startYear) : 0;
+    const scoreEnd = (endMonth && endYear !== undefined) ? getComboScore(endMonth, endYear) : 9999999;
 
     return businessSanitizedProjects.filter((p) => {
       const periodStr = p["Period"];
@@ -615,27 +621,37 @@ export default function App() {
                   Start:
                 </span>
                 <select
+                  disabled={isLoading || availableYears.length === 0}
                   value={startMonth}
                   onChange={(e) => handleStartMonthChange(e.target.value)}
-                  className="bg-transparent border-none text-xs font-bold text-gray-700 focus:outline-none focus:ring-0 cursor-pointer pr-1 leading-none"
+                  className="bg-transparent border-none text-xs font-bold text-gray-700 focus:outline-none focus:ring-0 cursor-pointer pr-1 leading-none disabled:opacity-50"
                 >
-                  {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
+                  {startMonth ? (
+                    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">—</option>
+                  )}
                 </select>
                 <span className="text-gray-300">|</span>
                 <select
-                  value={startYear}
+                  disabled={isLoading || availableYears.length === 0}
+                  value={startYear ?? ""}
                   onChange={(e) => handleStartYearChange(parseInt(e.target.value, 10))}
-                  className="bg-transparent border-none text-xs font-bold text-gray-700 focus:outline-none focus:ring-0 cursor-pointer pr-1 leading-none"
+                  className="bg-transparent border-none text-xs font-bold text-gray-700 focus:outline-none focus:ring-0 cursor-pointer pr-1 leading-none disabled:opacity-50"
                 >
-                  {availableYears.map((yr) => (
-                    <option key={yr} value={yr}>
-                      {yr}
-                    </option>
-                  ))}
+                  {startYear !== undefined ? (
+                    availableYears.map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">—</option>
+                  )}
                 </select>
               </div>
 
@@ -645,35 +661,45 @@ export default function App() {
                   End:
                 </span>
                 <select
+                  disabled={isLoading || availableYears.length === 0}
                   value={endMonth}
                   onChange={(e) => handleEndMonthChange(e.target.value)}
-                  className="bg-transparent border-none text-xs font-bold text-gray-700 focus:outline-none focus:ring-0 cursor-pointer pr-1 leading-none"
+                  className="bg-transparent border-none text-xs font-bold text-gray-700 focus:outline-none focus:ring-0 cursor-pointer pr-1 leading-none disabled:opacity-50"
                 >
-                  {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => {
-                    const sysDate = new Date();
-                    const curYear = sysDate.getFullYear();
-                    const curMonthIdx = sysDate.getMonth();
-                    const mIdx = MONTH_INDEX_MAP[m] ?? 0;
-                    const isFuturistic = endYear === curYear && mIdx > curMonthIdx;
-                    if (isFuturistic) return null;
-                    return (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    );
-                  })}
+                  {endMonth ? (
+                    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((m) => {
+                      const sysDate = new Date();
+                      const curYear = sysDate.getFullYear();
+                      const curMonthIdx = sysDate.getMonth();
+                      const mIdx = MONTH_INDEX_MAP[m] ?? 0;
+                      const isFuturistic = endYear === curYear && mIdx > curMonthIdx;
+                      if (isFuturistic) return null;
+                      return (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      );
+                    })
+                  ) : (
+                    <option value="">—</option>
+                  )}
                 </select>
                 <span className="text-gray-300">|</span>
                 <select
-                  value={endYear}
+                  disabled={isLoading || availableYears.length === 0}
+                  value={endYear ?? ""}
                   onChange={(e) => handleEndYearChange(parseInt(e.target.value, 10))}
-                  className="bg-transparent border-none text-xs font-bold text-gray-700 focus:outline-none focus:ring-0 cursor-pointer pr-1 leading-none"
+                  className="bg-transparent border-none text-xs font-bold text-gray-700 focus:outline-none focus:ring-0 cursor-pointer pr-1 leading-none disabled:opacity-50"
                 >
-                  {availableYears.map((yr) => (
-                    <option key={yr} value={yr}>
-                      {yr}
-                    </option>
-                  ))}
+                  {endYear !== undefined ? (
+                    availableYears.map((yr) => (
+                      <option key={yr} value={yr}>
+                        {yr}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">—</option>
+                  )}
                 </select>
               </div>
             </div>
@@ -686,7 +712,7 @@ export default function App() {
               }`}
             >
               <Icon name="refresh-cw" className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-              {isSyncing ? "Syncing... Please wait" : "Sync with Notion"}
+              {isSyncing ? "Syncing..." : "Sync with Notion"}
             </button>
           </div>
         </header>
